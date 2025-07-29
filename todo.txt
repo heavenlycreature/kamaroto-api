@@ -1,0 +1,5 @@
+this project was built using express v.5 and postgresql for the databases, you can read package.json to implement secure and functional logic based on installed library on this project.
+todo:
+- Based on the logic controller that has been created, adjust the configuration of routes, middleware and also its app.js.
+- Analyze the overall code and structure of the folder so that the placement is in accordance with the needs I apply
+- You can overhaul some code, but that's enough to get there, not to the point of running the NPM script

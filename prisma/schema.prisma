@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(100)
+  email      String   @unique @db.VarChar(100)
+  password   String   @db.VarChar(255)
+  role       Role     @default(customer)
+  status     Status   @default(pending)
+  phone      String   @db.VarChar(20)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  coProfile    CoProfile?
+  mitraProfile MitraProfile?
+}
+
+model CoProfile {
+  id                Int      @id @default(autoincrement())
+  user_id           Int      @unique
+  name              String   @db.VarChar(100)
+  password          String   @db.VarChar(255)
+  email             String   @unique @db.VarChar(100)
+  birth_date        DateTime @db.Date
+  gender            Gender
+  address_province  String   @db.VarChar(100)
+  address_city      String   @db.VarChar(100)
+  address_subdistrict String @db.VarChar(100)
+  address_village   String   @db.VarChar(100)
+  address_detail    String   @db.Text
+  job               String   @db.VarChar(100)
+  marital_status    String   @db.VarChar(50)
+  education         String   @db.VarChar(50)
+  selfie_url        String   @db.VarChar(255)
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("co_profiles")
+}
+
+model MitraProfile {
+  id                        Int      @id @default(autoincrement())
+  user_id                   Int      @unique
+  password                  String   @db.VarChar(255)
+  pic_name                  String   @db.VarChar(100)
+  pic_phone                 String   @db.VarChar(20)
+  pic_email                 String   @db.VarChar(100)
+  pic_status                PicStatus
+  owner_name                String   @db.VarChar(100)
+  owner_phone               String   @db.VarChar(20)
+  owner_email               String   @db.VarChar(100)
+  owner_ktp                 String   @db.VarChar(50)
+  owner_address_province    String   @db.VarChar(100)
+  owner_address_city        String   @db.VarChar(100)
+  owner_address_subdistrict String @db.VarChar(100)
+  owner_address_village     String   @db.VarChar(100)
+  owner_address_detail      String   @db.Text
+  business_type             BusinessType
+  business_entity           String   @db.VarChar(50)
+  business_address_province String   @db.VarChar(100)
+  business_address_city     String   @db.VarChar(100)
+  business_address_subdistrict String @db.VarChar(100)
+  business_address_village  String   @db.VarChar(100)
+  business_address_detail   String   @db.Text
+  business_duration         String   @db.VarChar(50)
+  social_media_platform     String   @db.VarChar(50)
+  social_media_account      String   @db.VarChar(100)
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("mitra_profiles")
+}
+
+model Address {
+  id          Int      @id @default(autoincrement())
+  province    String   // e.g., "DKI Jakarta"
+  city        String   // e.g., "Jakarta Pusat"
+  district    String   // Kecamatan, e.g., "Gambir"
+  subdistrict String   // Kelurahan, e.g., "Petojo Selatan"
+  latitude    Float
+  longitude   Float
+  
+  @@unique([province, city, district, subdistrict]) // Menjamin setiap alamat unik
+}
+
+enum Role {
+  admin
+  mitra
+  co
+  customer
+}
+
+enum Status {
+  pending
+  approved
+  rejected
+  active
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum PicStatus {
+  pemilik
+  pengelola
+}
+
+enum BusinessType {
+  jual_beli_kendaraan
+  bengkel
+  cuci_kendaraan
+  jual_beli_sparepart
+  sewa_kendaraan
+  insurance_consultant
+  pembiayaan
+  biro_jasa
+}
