@@ -124,7 +124,7 @@ exports.registerCo = async (req, res) => {
           },
         },
       },
-      select: { id: true, email: email, status: newUser.status }
+      select: { id: true, email: email, status: 'pending' }
     });
 
     res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
