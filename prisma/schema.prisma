@@ -28,7 +28,6 @@ model CoProfile {
   id                Int      @id @default(autoincrement())
   user_id           Int      @unique
   name              String   @db.VarChar(100)
-  password          String   @db.VarChar(255)
   email             String   @unique @db.VarChar(100)
   birth_date        DateTime @db.Date
   gender            Gender
@@ -41,6 +40,9 @@ model CoProfile {
   marital_status    String   @db.VarChar(50)
   education         String   @db.VarChar(50)
   selfie_url        String   @db.VarChar(255)
+  latitude          Float?
+  longitude         Float?
+
 
   user User @relation(fields: [user_id], references: [id])
 
@@ -50,7 +52,6 @@ model CoProfile {
 model MitraProfile {
   id                        Int      @id @default(autoincrement())
   user_id                   Int      @unique
-  password                  String   @db.VarChar(255)
   pic_name                  String   @db.VarChar(100)
   pic_phone                 String   @db.VarChar(20)
   pic_email                 String   @db.VarChar(100)
@@ -74,6 +75,9 @@ model MitraProfile {
   business_duration         String   @db.VarChar(50)
   social_media_platform     String   @db.VarChar(50)
   social_media_account      String   @db.VarChar(100)
+  latitude                  Float?
+  longitude                 Float?
+
 
   user User @relation(fields: [user_id], references: [id])
 
@@ -107,8 +111,8 @@ enum Status {
 }
 
 enum Gender {
-  male
-  female
+  pria
+  perempuan
 }
 
 enum PicStatus {

@@ -74,13 +74,21 @@ exports.registerCo = async (req, res) => {
     name, email, password, phone,
     birth_date, gender,
     address_province, address_city, address_subdistrict, address_village, address_detail,
-    job, marital_status, education
+    job, marital_status, education, latitude, longitude 
   } = req.body;
 
   // Cek apakah file diunggah
   if (!req.file) {
     return res.status(400).json({ message: 'Gambar selfie wajib diunggah.' });
   }
+
+  const birthDateObject = new Date(birth_date); // Ubah string menjadi objek Date
+    if (isNaN(birthDateObject.getTime())) {
+      // Jika string tidak valid (misal: "ini-bukan-tanggal"), kirim error yang jelas
+      return res.status(400).json({ 
+          message: "Format tanggal lahir tidak valid. Harap gunakan format YYYY-MM-DD." 
+      });
+    }
 
   // Buat URL yang bisa diakses publik dari nama file
   const selfie_url = `/uploads/selfies/${req.file.filename}`;
@@ -98,10 +106,9 @@ exports.registerCo = async (req, res) => {
         status: 'pending',
         coProfile: {
           create: {
-            // ... (field profil lainnya)
             name,
             email,
-            birth_date,
+            birth_date: birthDateObject,
             gender,
             address_province,
             address_city,
@@ -111,11 +118,13 @@ exports.registerCo = async (req, res) => {
             job,
             marital_status,
             education,
-            selfie_url: selfie_url, // Simpan path URL ke database
+            selfie_url: selfie_url,
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude),
           },
         },
       },
-      select: { id: true, email: true, role: true, status: true }
+      select: { id: true, email: email, status: newUser.status }
     });
 
     res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
