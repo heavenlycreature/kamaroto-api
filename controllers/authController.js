@@ -71,8 +71,8 @@ exports.registerMitra = async (req, res) => {
 exports.registerCo = async (req, res) => {
   // Data teks ada di req.body
   const {
-    name, email, password, phone,
-    birth_date, gender,
+    name, email, password, phone, nik,
+    birth_place, birth_date, gender,
     address_province, address_city, address_subdistrict, address_village, address_detail,
     job, marital_status, education, latitude, longitude 
   } = req.body;
@@ -108,6 +108,8 @@ exports.registerCo = async (req, res) => {
           create: {
             name,
             email,
+            nik,
+            birth_place,
             birth_date: birthDateObject,
             gender,
             address_province,
@@ -124,7 +126,7 @@ exports.registerCo = async (req, res) => {
           },
         },
       },
-      select: { id: true, email: email, status: 'pending' }
+      select: { id: true, email: true, status: true }
     });
 
     res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });

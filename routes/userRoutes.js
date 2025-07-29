@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
 const addressController = require('../controllers/addressController');
+const coController = require('../controllers/coController');
 const { authenticateToken, authorizeRoles } = require('../middleware/authMiddleware');
 
 // Get all pending users (Admin only)
@@ -19,7 +20,9 @@ router.put('/:userId/approve', authenticateToken, authorizeRoles('admin'), userC
 router.put('/:userId/reject', authenticateToken, authorizeRoles('admin'), userController.rejectUser);
 
 // Update CO profile (CO only)
-router.put('/co-profile', authenticateToken, authorizeRoles('co'), userController.updateCoProfile);
+router.put('/captain/profile/edit', authenticateToken, authorizeRoles('co'), coController.updateCaptainProfile);
+
+router.get('/captain/profile', authenticateToken, authorizeRoles('co'), coController.getCaptainProfile);
 
 // Update Mitra profile (Mitra only)
 router.put('/mitra-profile', authenticateToken, authorizeRoles('mitra'), userController.updateMitraProfile);
