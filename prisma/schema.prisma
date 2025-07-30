@@ -69,6 +69,7 @@ model MitraProfile {
   owner_address_detail      String   @db.Text
   business_type             BusinessType
   business_entity           String   @db.VarChar(50)
+  business_name             String?   @db.VarChar(100)
   business_address_province String   @db.VarChar(100)
   business_address_city     String   @db.VarChar(100)
   business_address_subdistrict String @db.VarChar(100)

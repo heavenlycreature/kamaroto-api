@@ -107,7 +107,15 @@ exports.getRegisteredMitra = async (req, res) => {
                             business_type: true,
                             business_entity: true,
                             pic_name: true,
-                            pic_phone: true
+                            pic_phone: true,
+                            pic_email: true,
+                            owner_name: true,
+                            owner_address_province: true,
+                            owner_address_city: true,
+                            owner_address_subdistrict: true,
+                            owner_address_village: true,
+                            owner_address_detail: true,
+                            
                         }
                     }
                 }

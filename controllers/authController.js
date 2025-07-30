@@ -16,9 +16,9 @@ exports.registerMitra = async (req, res) => {
     pic_name, pic_phone, pic_email, pic_status,
     owner_name, owner_phone, owner_email, owner_ktp,
     owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
-    business_type, business_entity,
+    business_type, business_entity, business_name,
     business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
-    business_duration, social_media_platform, social_media_account
+    business_duration, social_media_platform, social_media_account, latitude, longitude
   } = req.body;
 
   try {
@@ -39,9 +39,9 @@ exports.registerMitra = async (req, res) => {
             pic_name, pic_phone, pic_email, pic_status,
             owner_name, owner_phone, owner_email, owner_ktp,
             owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
-            business_type, business_entity,
+            business_type, business_entity, business_name,
             business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
-            business_duration, social_media_platform, social_media_account
+            business_duration, social_media_platform, social_media_account, latitude, longitude
           },
         },
       },
