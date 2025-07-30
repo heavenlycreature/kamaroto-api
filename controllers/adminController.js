@@ -58,7 +58,8 @@ exports.getPendingCo = async (req, res) => {
                     name: true,
                     email: true,
                     phone: true,
-                    created_at: true
+                    created_at: true,
+                    coProfile: true // Sertakan profil lengkapnya
                 }
             }),
             prisma.user.count({

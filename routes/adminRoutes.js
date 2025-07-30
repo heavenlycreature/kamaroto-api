@@ -12,8 +12,8 @@ router.use(authorizeRoles('admin')); // Lapis kedua: Pastikan user yang login me
 // Captain Officer (CO) Route List
 router.get('/co/verified', adminController.getVerifiedCo);
 router.get('/co/pending', adminController.getPendingCo);
-router.put('/co/approve/:userId', adminController.approveUserCo);
-router.put('/co/reject/:userId', adminController.rejectUserCo);
+router.put('/co/approved/:userId', adminController.approveUserCo);
+router.put('/co/rejected/:userId', adminController.rejectUserCo);
 // Mitra Route List
 router.get('/mitra/registered', adminController.getRegisteredMitra);
 
