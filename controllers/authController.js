@@ -87,7 +87,7 @@ exports.registerCo = async (req, res) => {
     if (isNaN(birthDateObject.getTime())) {
       // Jika string tidak valid (misal: "ini-bukan-tanggal"), kirim error yang jelas
       return res.status(400).json({ 
-          message: "Format tanggal lahir tidak valid. Harap gunakan format YYYY-MM-DD." 
+          message: "Format tanggal lahir tidak valid. Harap gunakan format yang sesuai" 
       });
     }
 
@@ -199,6 +199,7 @@ exports.loginUser = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role
       }
     });
 
