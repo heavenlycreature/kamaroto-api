@@ -131,3 +131,65 @@ exports.getRegisteredMitra = async (req, res) => {
         res.status(500).json({ message: "Terjadi kesalahan pada server." });
     }
 };
+
+/**
+ * Menyetujui pendaftaran user (hanya mengubah status).
+ */
+exports.approveUserCo = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: parseInt(userId) } });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User tidak ditemukan.' });
+    }
+
+    if (user.status === 'approved') {
+      return res.status(400).json({ message: 'User ini sudah disetujui sebelumnya.' });
+    }
+    
+    // Logika persetujuan disederhanakan: HANYA update status
+    // Profil sudah ada sejak pendaftaran
+    const approvedStatus = (user.role === 'mitra' || user.role === 'co') ? 'approved' : 'active';
+
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(userId) },
+      data: { status: approvedStatus },
+      select: { id: true, email: true, role: true, status: true }
+    });
+
+    res.status(200).json({ message: `User ${user.role} berhasil disetujui.`, user: updatedUser });
+
+  } catch (error) {
+    console.error('Approve user error:', error);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server saat menyetujui user.' });
+  }
+};
+
+/**
+ * Menolak pendaftaran user.
+ * (Logika ini sudah cukup baik, hanya dirapikan sedikit)
+ */
+exports.rejectUserCo = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: parseInt(userId) } });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User tidak ditemukan.' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(userId) },
+      data: { status: 'rejected' },
+      select: { id: true, email: true, role: true, status: true }
+    });
+
+    res.status(200).json({ message: 'User berhasil ditolak.', user: updatedUser });
+  } catch (error) {
+    console.error('Reject user error:', error);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server saat menolak user.' });
+  }
+};
