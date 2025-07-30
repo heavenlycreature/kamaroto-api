@@ -1,6 +1,7 @@
 const { PrismaClient, Prisma } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const fs = require('fs').promises;
 
 const prisma = new PrismaClient();
 
@@ -132,7 +133,27 @@ exports.registerCo = async (req, res) => {
     res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
 
   } catch (error) {
+    // 1. Hapus file yang sudah terlanjur di-upload jika ada error database
+    if (req.file) {
+      try {
+        await fs.unlink(req.file.path); // req.file.path berisi path lengkap ke file
+        console.log(`File ${req.file.filename} dihapus karena registrasi gagal.`);
+      } catch (unlinkError) {
+        // Jika penghapusan file juga gagal, cukup log error-nya
+        console.error(`Error saat menghapus file ${req.file.filename}:`, unlinkError);
+      }
+    }
+
+    // 2. Kirim respons error yang sesuai ke frontend
     console.error('Registration error:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const field = error.meta.target[0];
+        return res.status(400).json({
+            message: `Data pada kolom '${field}' sudah digunakan.`,
+            field: field 
+        });
+    }
+    
     res.status(500).json({ message: 'Terjadi kesalahan pada server saat registrasi.' });
   }
 };
