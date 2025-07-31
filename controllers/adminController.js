@@ -93,7 +93,8 @@ exports.getRegisteredMitra = async (req, res) => {
                     role: 'mitra',
                     mitraProfile: {
                         isNot: null // Memastikan profil mitra ada
-                    }
+                    },
+                    status: 'approved'
                 },
                 select: {
                     id: true,
@@ -102,22 +103,7 @@ exports.getRegisteredMitra = async (req, res) => {
                     phone: true,
                     status: true,
                     created_at: true,
-                    mitraProfile: { // Sertakan data spesifik dari profil mitra
-                        select: {
-                            business_type: true,
-                            business_entity: true,
-                            pic_name: true,
-                            pic_phone: true,
-                            pic_email: true,
-                            owner_name: true,
-                            owner_address_province: true,
-                            owner_address_city: true,
-                            owner_address_subdistrict: true,
-                            owner_address_village: true,
-                            owner_address_detail: true,
-                            
-                        }
-                    }
+                    mitraProfile: true,
                 }
             }),
             prisma.user.count({
@@ -125,7 +111,54 @@ exports.getRegisteredMitra = async (req, res) => {
                     role: 'mitra',
                     mitraProfile: {
                         isNot: null
-                    }
+                    },
+                    status: 'approved'
+                }
+            })
+        ]);
+        
+        res.status(200).json({
+            message: "Data Mitra terdaftar berhasil diambil.",
+            total,
+            data: mitras
+        });
+    } catch (error) {
+        console.error("Error fetching registered Mitras:", error);
+        res.status(500).json({ message: "Terjadi kesalahan pada server." });
+    }
+};
+/**
+ * Mengambil daftar dan total Mitra yang memiliki status pending.
+ * Kriteria: role = 'mitra' dan memiliki profil
+ */
+exports.getPendingMitra = async (req, res) => {
+    try {
+        const [mitras, total] = await prisma.$transaction([
+            prisma.user.findMany({
+                where: {
+                    role: 'mitra',
+                     mitraProfile: {
+                        isNot: null // Memastikan profil mitra ada
+                    },
+                    status: 'pending',
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                    status: true,
+                    created_at: true,
+                    mitraProfile: true,
+                }
+            }),
+            prisma.user.count({
+                where: {
+                    role: 'mitra',
+                     mitraProfile: {
+                        isNot: null // Memastikan profil mitra ada
+                    },
+                    status: 'pending'
                 }
             })
         ]);
@@ -142,63 +175,70 @@ exports.getRegisteredMitra = async (req, res) => {
 };
 
 /**
- * Menyetujui pendaftaran user (hanya mengubah status).
+ * Menyetujui pendaftaran user (CO atau Mitra) secara dinamis.
  */
-exports.approveUserCo = async (req, res) => {
-  const { userId } = req.params;
+exports.approveUser = async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const user = await prisma.user.findUnique({ where: { id: parseInt(userId) } });
+        if (!user) {
+            return res.status(404).json({ message: 'User tidak ditemukan.' });
+        }
 
-  try {
-    const user = await prisma.user.findUnique({ where: { id: parseInt(userId) } });
+        // Tentukan model profil yang akan di-update berdasarkan role user
+        let profileModel;
+        if (user.role === 'co') {
+            profileModel = prisma.coProfile;
+        } else if (user.role === 'mitra') {
+            profileModel = prisma.mitraProfile;
+        } else {
+            // Jika role lain, cukup setujui user tanpa update profil
+            await prisma.user.update({ where: { id: parseInt(userId) }, data: { status: 'active' } });
+            return res.status(200).json({ message: `User ${user.role} berhasil diaktifkan.` });
+        }
 
-    if (!user) {
-      return res.status(404).json({ message: 'User tidak ditemukan.' });
+        // Jalankan update pada User dan Profil dalam satu transaksi
+        await prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: parseInt(userId) },
+                data: { status: 'approved', resubmit_allowed: false },
+            });
+            await profileModel.update({
+                where: { user_id: parseInt(userId) },
+                data: { is_verified: true, approved_at: new Date() },
+            });
+        });
+
+        res.status(200).json({ message: `User ${user.role} dengan ID ${userId} berhasil disetujui.` });
+    } catch (error) {
+        console.error('Approve user error:', error);
+        res.status(500).json({ message: 'Gagal menyetujui user.' });
     }
-
-    if (user.status === 'approved') {
-      return res.status(400).json({ message: 'User ini sudah disetujui sebelumnya.' });
-    }
-    
-    // Logika persetujuan disederhanakan: HANYA update status
-    // Profil sudah ada sejak pendaftaran
-    const approvedStatus = (user.role === 'mitra' || user.role === 'co') ? 'approved' : 'active';
-
-    const updatedUser = await prisma.user.update({
-      where: { id: parseInt(userId) },
-      data: { status: approvedStatus },
-      select: { id: true, email: true, role: true, status: true }
-    });
-
-    res.status(200).json({ message: `User ${user.role} berhasil disetujui.`, user: updatedUser });
-
-  } catch (error) {
-    console.error('Approve user error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan pada server saat menyetujui user.' });
-  }
 };
 
 /**
- * Menolak pendaftaran user.
- * (Logika ini sudah cukup baik, hanya dirapikan sedikit)
+ * Menolak pendaftaran user (CO atau Mitra) dengan alasan.
  */
-exports.rejectUserCo = async (req, res) => {
-  const { userId } = req.params;
+exports.rejectUser = async (req, res) => {
+    const { userId } = req.params;
+    const { rejection_reason, resubmit_allowed } = req.body;
 
-  try {
-    const user = await prisma.user.findUnique({ where: { id: parseInt(userId) } });
-
-    if (!user) {
-      return res.status(404).json({ message: 'User tidak ditemukan.' });
+    if (!rejection_reason) {
+        return res.status(400).json({ message: 'Alasan penolakan wajib diisi.' });
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: parseInt(userId) },
-      data: { status: 'rejected' },
-      select: { id: true, email: true, role: true, status: true }
-    });
-
-    res.status(200).json({ message: 'User berhasil ditolak.', user: updatedUser });
-  } catch (error) {
-    console.error('Reject user error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan pada server saat menolak user.' });
-  }
+    try {
+        await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: {
+                status: 'rejected',
+                rejection_reason,
+                resubmit_allowed,
+            },
+        });
+        res.status(200).json({ message: `User dengan ID ${userId} berhasil ditolak.` });
+    } catch (error) {
+        console.error('Reject user error:', error);
+        res.status(500).json({ message: 'Gagal menolak user.' });
+    }
 };

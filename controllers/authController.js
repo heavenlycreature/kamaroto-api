@@ -159,6 +159,53 @@ exports.registerCo = async (req, res) => {
 };
 
 /**
+ * Logic untuk menhandle resubmit profile
+ */
+
+exports.resubmitProfile = async (req, res) => {
+    // Ambil user ID dan role dari token JWT yang sudah diverifikasi
+    const { id: userId, role } = req.user; 
+    const updatedProfileData = req.body;
+
+    try {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user || user.status !== 'rejected' || !user.resubmit_allowed) {
+            return res.status(403).json({ message: 'Anda tidak diizinkan untuk melakukan pendaftaran ulang.' });
+        }
+        
+        // Tentukan model profil yang akan di-update berdasarkan role dari token
+        let profileModel;
+        if (role === 'co') {
+            profileModel = prisma.coProfile;
+        } else if (role === 'mitra') {
+            profileModel = prisma.mitraProfile;
+        } else {
+            return res.status(400).json({ message: 'Tipe user tidak valid untuk pendaftaran ulang.' });
+        }
+
+        await prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    status: 'pending',
+                    resubmitted_at: new Date(),
+                    rejection_reason: '',
+                },
+            });
+            await profileModel.update({
+                where: { user_id: userId },
+                data: updatedProfileData,
+            });
+        });
+
+        res.status(200).json({ message: 'Data berhasil dikirim ulang dan akan ditinjau kembali oleh admin.' });
+    } catch (error) {
+        console.error('Resubmit Profile error:', error);
+        res.status(500).json({ message: 'Gagal mengirim ulang data.' });
+    }
+};
+
+/**
  * Proses login untuk semua user (admin, mitra, co, customer).
  */
 exports.loginUser = async (req, res) => {
