@@ -1,6 +1,3 @@
-// controllers/coController.js
-// Controller ini sekarang secara otomatis memperbarui koordinat saat alamat diubah.
-
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
