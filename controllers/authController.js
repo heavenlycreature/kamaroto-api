@@ -2,6 +2,7 @@ const { PrismaClient, Prisma } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
+const path = require('path'); 
 
 const prisma = new PrismaClient();
 
@@ -158,14 +159,57 @@ exports.registerCo = async (req, res) => {
   }
 };
 
+// Fungsi baru untuk mengambil profil lengkap user yang sedang login
+exports.getCurrentUserProfile = async (req, res) => {
+    // SOLUSI: Ambil id dan role dari req.user (token), BUKAN req.params.
+    const { id: userId, role } = req.user; 
+
+    try {
+        let includeClause = {};
+        if (role === 'co') {
+            includeClause = { coProfile: true };
+        } else if (role === 'mitra') {
+            includeClause = { mitraProfile: true };
+        } else {
+            return res.status(400).json({ message: "Role pengguna tidak valid untuk operasi ini." });
+        }
+
+        const userWithProfile = await prisma.user.findUnique({
+            where: { id: userId }, // Gunakan userId dari token
+            // Gunakan 'select' untuk keamanan, agar tidak mengirim hash password
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+                role: true,
+                status: true,
+                rejection_reason: true,
+                resubmit_allowed: true,
+                coProfile: includeClause.coProfile,
+                mitraProfile: includeClause.mitraProfile,
+            }
+        });
+
+        if (!userWithProfile) {
+            return res.status(404).json({ message: "Profil tidak ditemukan." });
+        }
+
+        res.status(200).json(userWithProfile);
+    } catch (error) {
+        console.error("Get current user profile error:", error);
+        res.status(500).json({ message: "Gagal mengambil data profil." });
+    }
+};
+
+
 /**
  * Logic untuk menhandle resubmit profile
  */
 
 exports.resubmitProfile = async (req, res) => {
-    // Ambil user ID dan role dari token JWT yang sudah diverifikasi
     const { id: userId, role } = req.user; 
-    const updatedProfileData = req.body;
+    const allData = req.body; // Ambil semua data dari body
 
     try {
         const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -173,85 +217,191 @@ exports.resubmitProfile = async (req, res) => {
             return res.status(403).json({ message: 'Anda tidak diizinkan untuk melakukan pendaftaran ulang.' });
         }
         
-        // Tentukan model profil yang akan di-update berdasarkan role dari token
+        // --- SOLUSI: Pisahkan data untuk setiap tabel ---
+        
+        // 1. Siapkan data HANYA untuk tabel User
+        const userDataForUpdate = {
+            name: allData.name,
+            email: allData.email,
+            phone: allData.phone,
+        };
+
+        // 2. Siapkan data HANYA untuk tabel Profil secara dinamis
+        let profileDataForUpdate = {};
         let profileModel;
+         if (req.file && role === 'co') { // Hanya berlaku jika ada file BARU yang diupload
+            const existingProfile = await prisma.coProfile.findUnique({
+                where: { user_id: userId },
+                select: { selfie_url: true }
+            });
+
+            if (existingProfile && existingProfile.selfie_url) {
+                const oldFilePath = path.join(__dirname, '..', 'public', existingProfile.selfie_url);
+                try {
+                    await fs.unlink(oldFilePath);
+                    console.log(`File lama ${existingProfile.selfie_url} berhasil dihapus.`);
+                } catch (unlinkError) {
+                    console.error(`Gagal menghapus file lama: ${oldFilePath}`, unlinkError);
+                }
+            }
+        }
+
         if (role === 'co') {
             profileModel = prisma.coProfile;
+            profileDataForUpdate = {
+                name: allData.name,
+                email: allData.email,
+                nik: allData.nik,
+                birth_place: allData.birth_place,
+                birth_date: new Date(allData.birth_date),
+                gender: allData.gender,
+                address_province: allData.address_province,
+                address_city: allData.address_city,
+                address_subdistrict: allData.address_subdistrict,
+                address_village: allData.address_village,
+                address_detail: allData.address_detail,
+                job: allData.job,
+                marital_status: allData.marital_status,
+                education: allData.education,
+            };
+            // Tambahkan file selfie baru jika diunggah
+            if (req.file) {
+                profileDataForUpdate.selfie_url = `/uploads/selfies/${req.file.filename}`;
+            }
         } else if (role === 'mitra') {
             profileModel = prisma.mitraProfile;
+            // (Buat objek serupa untuk data Mitra di sini)
         } else {
             return res.status(400).json({ message: 'Tipe user tidak valid untuk pendaftaran ulang.' });
         }
-
+        
+        // 3. Jalankan transaksi dengan data yang sudah dipisah
         await prisma.$transaction(async (tx) => {
             await tx.user.update({
                 where: { id: userId },
                 data: {
+                    ...userDataForUpdate,
                     status: 'pending',
                     resubmitted_at: new Date(),
-                    rejection_reason: '',
+                    rejection_reason: null, // Set kembali ke null
                 },
             });
             await profileModel.update({
                 where: { user_id: userId },
-                data: updatedProfileData,
+                data: profileDataForUpdate,
             });
         });
 
         res.status(200).json({ message: 'Data berhasil dikirim ulang dan akan ditinjau kembali oleh admin.' });
     } catch (error) {
+        // Hapus file jika ada error database
+        if (req.file) {
+            try {
+                await require('fs').promises.unlink(req.file.path);
+            } catch (unlinkError) {
+                console.error("Error deleting file after failed resubmit:", unlinkError);
+            }
+        }
         console.error('Resubmit Profile error:', error);
         res.status(500).json({ message: 'Gagal mengirim ulang data.' });
     }
 };
 
-/**
- * Proses login untuk semua user (admin, mitra, co, customer).
- */
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // 1. Cari user HANYA di tabel 'users' berdasarkan email
+    // 1. Cari user TANPA include dulu untuk verifikasi dasar
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email }
     });
 
-    // 2. Jika user tidak ditemukan atau password salah, kirim response yang sama
-    if (!user) {
+    // 2. Validasi dasar
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Email atau password salah.' });
     }
 
-    const isPasswordMatch = await bcrypt.compare(password, user.password);
-    if (!isPasswordMatch) {
-      return res.status(401).json({ message: 'Email atau password salah.' });
-    }
-
-    // 3. Cek status user. Hanya yang 'approved' (atau 'active' untuk non-mitra/co) yang boleh login
-    if (user.status !== 'approved' && user.status !== 'active') { // 'active' mungkin untuk admin/customer
-      return res.status(403).json({ message: `Akun Anda berstatus '${user.status}'. Silakan hubungi admin.` });
-    }
-
-    // 4. Jika semua valid, buat JWT
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
-    res.status(200).json({
-      message: 'Login berhasil.',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
+    // 3. Ambil data lengkap dengan profile sesuai role
+    const userWithProfile = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        coProfile: user.role === 'co',
+        mitraProfile: user.role === 'mitra'
       }
     });
 
+    // 4. Format data profil
+    const formatProfile = (profile) => {
+      if (!profile) return null;
+      const formatted = { ...profile };
+      // Hapus field yang tidak perlu
+      delete formatted.id;
+      delete formatted.user_id;
+      delete formatted.is_verified;
+      delete formatted.approved_at;
+      return formatted;
+    };
+
+    const profileData = userWithProfile.coProfile 
+      ? formatProfile(userWithProfile.coProfile) 
+      : formatProfile(userWithProfile.mitraProfile);
+
+    // 5. Response dasar
+    const baseResponse = {
+      id: userWithProfile.id,
+      name: userWithProfile.name,
+      email: userWithProfile.email,
+      phone: userWithProfile.phone,
+      role: userWithProfile.role,
+      status: userWithProfile.status,
+      rejection_reason: userWithProfile.rejection_reason,
+      resubmit_allowed: userWithProfile.resubmit_allowed,
+      created_at: userWithProfile.created_at,
+      profile: profileData
+    };
+
+    // 6. Handle berdasarkan status user
+    switch (userWithProfile.status) {
+      case 'approved':
+      case 'active':
+        return res.status(200).json({
+          message: 'Login berhasil',
+          token: jwt.sign(
+            { ...baseResponse, scope: 'full' },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+          ),
+          user: baseResponse
+        });
+
+      case 'rejected':
+        const response = {
+          message: 'Akun Anda ditolak. Harap mengirim ulang data.',
+          user: baseResponse
+        };
+
+        if (userWithProfile.resubmit_allowed) {
+          response.token = jwt.sign(
+            { ...baseResponse, scope: user.status === 'rejected' ? 'resubmit' : 'full' },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+          );
+        }
+
+        return res.status(403).json(response);
+
+      default: // pending
+        return res.status(403).json({
+          message: `Akun Anda berstatus '${userWithProfile.status}'. Harap menunggu persetujuan admin`,
+          user: baseResponse
+        });
+    }
+
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan pada server saat login.' });
+    return res.status(500).json({ 
+      message: 'Terjadi kesalahan saat login.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };

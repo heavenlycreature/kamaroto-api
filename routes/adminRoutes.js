@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const { authenticateToken, authorizeRoles } = require('../middleware/authMiddleware'); 
+const { authenticateToken, authorizeRoles } = require('../middleware/auth/authMiddleware'); 
 
 // Setiap request ke rute admin akan melewati dua lapis keamanan ini secara berurutan.
 router.use(authenticateToken); // Lapis pertama: Pastikan user sudah login (memiliki token valid)
