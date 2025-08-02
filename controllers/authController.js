@@ -263,6 +263,8 @@ exports.resubmitProfile = async (req, res) => {
                 job: allData.job,
                 marital_status: allData.marital_status,
                 education: allData.education,
+                latitude: parseFloat(allData.latitude),
+                longitude: parseFloat(allData.longitude),
             };
             // Tambahkan file selfie baru jika diunggah
             if (req.file) {
@@ -270,9 +272,50 @@ exports.resubmitProfile = async (req, res) => {
             }
         } else if (role === 'mitra') {
             profileModel = prisma.mitraProfile;
-            // (Buat objek serupa untuk data Mitra di sini)
+             profileDataForUpdate = {
+                pic_name: allData.pic_name,
+                pic_phone: allData.pic_phone,
+                pic_email: allData.pic_email,
+                pic_status: allData.pic_status,
+                owner_name: allData.owner_name,
+                owner_phone: allData.owner_phone,
+                owner_email: allData.owner_email,
+                owner_ktp: allData.owner_ktp,
+                owner_address_province: allData.owner_address_province,
+                owner_address_city: allData.owner_address_city,
+                owner_address_subdistrict: allData.owner_address_subdistrict,
+                owner_address_village: allData.owner_address_village,
+                owner_address_detail: allData.owner_address_detail,
+                business_type: allData.business_type,
+                business_entity: allData.business_entity,
+                business_name: allData.business_name,
+                business_address_province: allData.business_address_province,
+                business_address_city: allData.business_address_city,
+                business_address_subdistrict: allData.business_address_subdistrict,
+                business_address_village: allData.business_address_village,
+                business_address_detail: allData.business_address_detail,
+                business_duration: allData.business_duration,
+                social_media_platform: allData.social_media_platform,
+                social_media_account: allData.social_media_account,
+                latitude: parseFloat(allData.latitude),
+                longitude: parseFloat(allData.longitude),
+            };
         } else {
             return res.status(400).json({ message: 'Tipe user tidak valid untuk pendaftaran ulang.' });
+        }
+        
+        if (req.file) {
+            const existingProfile = await profileModel.findUnique({
+                where: { user_id: userId },
+                select: { selfie_url: true } // Asumsi Mitra juga punya selfie_url jika perlu
+            });
+
+            if (existingProfile && existingProfile.selfie_url) {
+                const oldFilePath = path.join(__dirname, '..', 'public', existingProfile.selfie_url);
+                try { await fs.unlink(oldFilePath); } catch (e) { console.error("Gagal hapus file lama:", e); }
+            }
+            // Tambahkan URL baru ke data yang akan diupdate
+            profileDataForUpdate.selfie_url = `/uploads/selfies/${req.file.filename}`;
         }
         
         // 3. Jalankan transaksi dengan data yang sudah dipisah
