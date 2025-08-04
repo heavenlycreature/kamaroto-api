@@ -233,7 +233,7 @@ exports.approveUser = async (req, res) => {
                         user_id: referral.referrer_id,
                         amount: referral.reward_point,
                         type: 'referral',
-                        description: `Reward referral untuk pendaftaran ${userToApprove.name}`
+                        description: `Reward referral untuk pendaftaran ${user.name}`
                     }
                 });
                 await tx.referral.update({
