@@ -6,6 +6,22 @@ const path = require('path');
 
 const prisma = new PrismaClient();
 
+
+async function validateReferral(referralCode) {
+    if (!referralCode) return null;
+
+    const referrerProfile = await prisma.coProfile.findUnique({
+        where: { referral_code: referralCode },
+        include: { user: true },
+    });
+
+    if (!referrerProfile || referrerProfile.user.status !== 'approved') {
+        throw new Error("Kode referral tidak valid atau tidak aktif.");
+    }
+    return referrerProfile.user.id; // Kembalikan ID referrer
+}
+
+
 /**
  * Mendaftarkan user Mitra baru beserta profilnya dalam satu transaksi.
  */
@@ -14,7 +30,7 @@ exports.registerMitra = async (req, res) => {
   const {
     name, email, password, phone, // Data untuk tabel 'users'
     // Data untuk tabel 'mitra_profiles'
-    pic_name, pic_phone, pic_email, pic_status,
+    referral_code, pic_name, pic_phone, pic_email, pic_status,
     owner_name, owner_phone, owner_email, owner_ktp,
     owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
     business_type, business_entity, business_name,
@@ -23,10 +39,11 @@ exports.registerMitra = async (req, res) => {
   } = req.body;
 
   try {
-    // 2. Hash password sebelum disimpan
+    // Hash password sebelum disimpan
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // 3. Gunakan nested write untuk membuat User dan MitraProfile sekaligus (transaksional)
+    
+    const referrerId = await validateReferral(referral_code);
+    // Gunakan nested write untuk membuat User dan MitraProfile sekaligus (transaksional)
     const newUser = await prisma.user.create({
       data: {
         name,
@@ -55,6 +72,17 @@ exports.registerMitra = async (req, res) => {
       }
     });
 
+    if (referrerId) {
+            await prisma.referral.create({
+                data: {
+                    referrer_id: referrerId,
+                    referred_id: newUser.id,
+                    type: 'co',
+                    reward_point: 100, // Contoh poin
+                }
+            });
+      }
+
     res.status(201).json({ message: 'Pendaftaran mitra berhasil, menunggu persetujuan admin.', user: newUser });
 
   } catch (error) {
@@ -75,7 +103,7 @@ exports.registerCo = async (req, res) => {
   const {
     name, email, password, phone, nik,
     birth_place, birth_date, gender,
-    address_province, address_city, address_subdistrict, address_village, address_detail,
+    address_province, address_city, referral_code, address_subdistrict, address_village, address_detail,
     job, marital_status, education, latitude, longitude 
   } = req.body;
 
@@ -97,6 +125,7 @@ exports.registerCo = async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
+    const referrerId = await validateReferral(referral_code);
 
     const newUser = await prisma.user.create({
       data: {
@@ -130,6 +159,16 @@ exports.registerCo = async (req, res) => {
       },
       select: { id: true, email: true, status: true }
     });
+     if (referrerId) {
+            await prisma.referral.create({
+                data: {
+                    referrer_id: referrerId,
+                    referred_id: newUser.id,
+                    type: 'co',
+                    reward_point: 100, // Contoh poin
+                }
+            });
+        }
 
     res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
 

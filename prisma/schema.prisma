@@ -25,6 +25,10 @@ model User {
 
   coProfile    CoProfile?
   mitraProfile MitraProfile?
+
+  referred     Referral[] @relation("ReferredUsers")
+  referralsMade Referral[] @relation("ReferringUsers")
+  points        Point[]
 }
 
 model CoProfile {
@@ -47,6 +51,7 @@ model CoProfile {
   selfie_url        String   @db.VarChar(255)
   is_verified       Boolean  @default(false)
   approved_at       DateTime? @db.Timestamptz(6)
+  referral_code String? @unique @db.VarChar(10)
   latitude          Float?
   longitude         Float?
 
@@ -104,6 +109,40 @@ model Address {
   longitude   Float
   
   @@unique([province, city, district, subdistrict]) // Menjamin setiap alamat unik
+}
+
+model Referral {
+  id           Int     @id @default(autoincrement())
+  referrer_id  Int     // ID dari CO yang memberi referral
+  referred_id  Int     @unique // ID dari user baru yang direferensikan
+  type         Role    // 'co' atau 'mitra'
+  reward_point Int
+  rewarded     Boolean @default(false)
+  created_at   DateTime @default(now())
+
+  referrer User @relation("ReferringUsers", fields: [referrer_id], references: [id])
+  referred User @relation("ReferredUsers", fields: [referred_id], references: [id])
+  
+  @@map("referrals")
+}
+
+model Point {
+  id          Int       @id @default(autoincrement())
+  user_id     Int
+  amount      Int
+  type        PointType
+  description String    @db.Text
+  created_at  DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("points")
+}
+
+enum PointType {
+  referral
+  transaction
+  redeem
 }
 
 enum Role {

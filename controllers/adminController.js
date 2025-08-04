@@ -1,6 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+
+function generateReferralCode(length = 8) {
+      return crypto.randomUUID().replace(/-/g, '').substring(0, 8);
+}
+
+
 /**
  * Mengambil daftar dan total Captain Officer (CO) yang sudah terverifikasi.
  * Kriteria: role = 'co', status = 'approved'
@@ -197,6 +203,7 @@ exports.approveUser = async (req, res) => {
             return res.status(200).json({ message: `User ${user.role} berhasil diaktifkan.` });
         }
 
+        
         // Jalankan update pada User dan Profil dalam satu transaksi
         await prisma.$transaction(async (tx) => {
             await tx.user.update({
@@ -207,7 +214,35 @@ exports.approveUser = async (req, res) => {
                 where: { user_id: parseInt(userId) },
                 data: { is_verified: true, approved_at: new Date() },
             });
+            if (user.role === 'co') {
+                    await tx.coProfile.update({
+                        where: { user_id: parseInt(userId) },
+                        data: { referral_code: generateReferralCode() }
+                    });
+            }
+            // 3. Cek apakah user ini direferensikan oleh orang lain
+            const referral = await tx.referral.findFirst({
+                where: {
+                    referred_id: parseInt(userId),
+                    rewarded: false,
+                }
+            });
+            if (referral) {
+                await tx.point.create({
+                    data: {
+                        user_id: referral.referrer_id,
+                        amount: referral.reward_point,
+                        type: 'referral',
+                        description: `Reward referral untuk pendaftaran ${userToApprove.name}`
+                    }
+                });
+                await tx.referral.update({
+                    where: { id: referral.id },
+                    data: { rewarded: true }
+                });
+            }
         });
+        
 
         res.status(200).json({ message: `User ${user.role} dengan ID ${userId} berhasil disetujui.` });
     } catch (error) {
