@@ -286,15 +286,36 @@ exports.updateSettings = async (req, res) => {
         return res.status(400).json({ message: "Format input tidak valid." });
     }
 
+    const numericSettingKeys = ['referral_reward_co', 'referral_reward_mitra'];
+     for (const setting of settingsToUpdate) {
+        if (numericSettingKeys.includes(setting.key)) {
+            if (isNaN(parseInt(setting.value, 10))) {
+                return res.status(400).json({ 
+                    message: `Nilai untuk pengaturan '${setting.key}' harus berupa angka.` 
+                });
+            }
+        }
+    }
     try {
-        await prisma.$transaction(
-            settingsToUpdate.map(setting => 
-                prisma.setting.update({
-                    where: { key: setting.key },
-                    data: { value: setting.value },
-                })
-            )
+          const updatePromises = settingsToUpdate.map(setting => 
+            prisma.setting.upsert({
+                where: { key: setting.key }, // Kondisi untuk mencari
+                // Data yang akan di-update JIKA ditemukan
+                update: { 
+                    value: setting.value 
+                },
+                // Data yang akan dibuat JIKA TIDAK ditemukan
+                create: {
+                    key: setting.key,
+                    value: setting.value,
+                    // Anda bisa menambahkan deskripsi default jika perlu
+                    description: `Pengaturan untuk ${setting.key}`
+                },
+            })
         );
+
+        await prisma.$transaction(updatePromises);
+        
         res.status(200).json({ message: "Pengaturan berhasil diperbarui." });
     } catch (error) {
         res.status(500).json({ message: "Gagal memperbarui pengaturan." });
