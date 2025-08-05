@@ -401,100 +401,56 @@ exports.resubmitProfile = async (req, res) => {
 };
 
 exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  try {
-    // 1. Cari user TANPA include dulu untuk verifikasi dasar
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
+    try {
+        // 1. Cari user (tetap sama, ini sudah baik)
+        const user = await prisma.user.findUnique({ where: { email } });
 
-    // 2. Validasi dasar
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: 'Email atau password salah.' });
-    }
-
-    // 3. Ambil data lengkap dengan profile sesuai role
-    const userWithProfile = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: {
-        coProfile: user.role === 'co',
-        mitraProfile: user.role === 'mitra'
-      }
-    });
-
-    // 4. Format data profil
-    const formatProfile = (profile) => {
-      if (!profile) return null;
-      const formatted = { ...profile };
-      // Hapus field yang tidak perlu
-      delete formatted.id;
-      delete formatted.user_id;
-      delete formatted.is_verified;
-      delete formatted.approved_at;
-      return formatted;
-    };
-
-    const profileData = userWithProfile.coProfile 
-      ? formatProfile(userWithProfile.coProfile) 
-      : formatProfile(userWithProfile.mitraProfile);
-
-    // 5. Response dasar
-    const baseResponse = {
-      id: userWithProfile.id,
-      name: userWithProfile.name,
-      email: userWithProfile.email,
-      phone: userWithProfile.phone,
-      role: userWithProfile.role,
-      status: userWithProfile.status,
-      rejection_reason: userWithProfile.rejection_reason,
-      resubmit_allowed: userWithProfile.resubmit_allowed,
-      created_at: userWithProfile.created_at,
-      profile: profileData
-    };
-
-    // 6. Handle berdasarkan status user
-    switch (userWithProfile.status) {
-      case 'approved':
-      case 'active':
-        return res.status(200).json({
-          message: 'Login berhasil',
-          token: jwt.sign(
-            { ...baseResponse, scope: 'full' },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-          ),
-          user: baseResponse
-        });
-
-      case 'rejected':
-        const response = {
-          message: 'Akun Anda ditolak. Harap mengirim ulang data.',
-          user: baseResponse
-        };
-
-        if (userWithProfile.resubmit_allowed) {
-          response.token = jwt.sign(
-            { ...baseResponse, scope: user.status === 'rejected' ? 'resubmit' : 'full' },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-          );
+        // 2. Validasi dasar (tetap sama)
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({ message: 'Email atau password salah.' });
         }
 
-        return res.status(403).json(response);
+        // --- PERUBAHAN UTAMA DIMULAI DI SINI ---
 
-      default: // pending
-        return res.status(403).json({
-          message: `Akun Anda berstatus '${userWithProfile.status}'. Harap menunggu persetujuan admin`,
-          user: baseResponse
+        // 3. Buat token terlebih dahulu, berdasarkan status
+        let tokenScope = 'full'; // Default scope
+        if (user.status === 'rejected' && user.resubmit_allowed) {
+            tokenScope = 'resubmit';
+        } else if (user.status === 'pending') {
+            tokenScope = 'limited'; // Contoh scope baru untuk user pending
+        }
+
+        const token = jwt.sign(
+            { id: user.id, role: user.role, status: user.status, scope: tokenScope },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // 4. Buat respons yang akan dikirim, termasuk token
+        const responsePayload = {
+            message: 'Otentikasi berhasil.', // Pesan lebih netral
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                status: user.status,
+                rejection_reason: user.rejection_reason,
+                resubmit_allowed: user.resubmit_allowed
+            }
+        };
+        
+        // 5. Selalu kembalikan status 200 OK jika kredensial benar
+        // Biarkan frontend yang memutuskan apa yang harus dilakukan berdasarkan 'status'
+        return res.status(200).json(responsePayload);
+
+    } catch (error) {
+        console.error('Login error:', error);
+        return res.status(500).json({ 
+            message: 'Terjadi kesalahan saat login.',
         });
     }
-
-  } catch (error) {
-    console.error('Login error:', error);
-    return res.status(500).json({ 
-      message: 'Terjadi kesalahan saat login.',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
 };

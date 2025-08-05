@@ -29,6 +29,6 @@ router.get('/mitra/profile', authenticateToken, authorizeRoles('mitra'), mitraCo
 
 // Route for resubmit both co/mitra
 router.put('/resubmit', allowResubmit, upload.single('selfie_url'),  authController.resubmitProfile);
-router.get('/profile/me/:userId', allowResubmit, authController.getCurrentUserProfile);
+router.get('/profile/me', allowResubmit, authController.getCurrentUserProfile);
 
 module.exports = router;
