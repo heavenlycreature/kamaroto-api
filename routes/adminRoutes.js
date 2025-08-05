@@ -19,5 +19,8 @@ router.get('/mitra/registered', adminController.getRegisteredMitra);
 router.get('/mitra/pending', adminController.getPendingUsers);
 router.put('/mitra/approved/:userId', adminController.approveUser);
 router.put('/mitra/rejected/:userId', adminController.rejectUser);
+// set referral point
+router.get('/settings', adminController.getSettings);
+router.put('/settings', adminController.updateSettings);
 
 module.exports = router;

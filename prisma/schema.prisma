@@ -139,6 +139,18 @@ model Point {
   @@map("points")
 }
 
+// schema.prisma
+
+model Setting {
+  id          Int     @id @default(autoincrement())
+  key         String  @unique @db.VarChar(50) // Nama pengaturan, e.g., "referral_reward_co"
+  value       String?  @db.Text                 // Nilai pengaturan, e.g., "100"
+  description String? @db.Text                 // Penjelasan tentang pengaturan ini
+
+  @@map("settings")
+}
+
+
 enum PointType {
   referral
   transaction

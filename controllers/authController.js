@@ -23,6 +23,12 @@ async function validateReferral(referralCode) {
     return referrerProfile.user.id; // Kembalikan ID referrer
 }
 
+async function getSettingValue(key) {
+    const setting = await prisma.setting.findUnique({ where: { key } });
+    if (!setting) throw new Error(`Setting dengan key '${key}' tidak ditemukan.`);
+    // Kembalikan sebagai angka
+    return parseInt(setting.value, 10);
+}
 
 /**
  * Mendaftarkan user Mitra baru beserta profilnya dalam satu transaksi.
@@ -75,12 +81,13 @@ exports.registerMitra = async (req, res) => {
     });
 
     if (referrerId) {
+      const rewardPoint = await getSettingValue('referral_reward_co');
             await prisma.referral.create({
                 data: {
                     referrer_id: referrerId,
                     referred_id: newUser.id,
                     type: 'co',
-                    reward_point: 100, // Contoh poin
+                    reward_point: rewardPoint,
                 }
             });
       }
@@ -161,12 +168,13 @@ exports.registerCo = async (req, res) => {
       select: { id: true, email: true, status: true }
     });
      if (referrerId) {
+      const rewardPoint = await getSettingValue('referral_reward_co');
             await prisma.referral.create({
                 data: {
                     referrer_id: referrerId,
                     referred_id: newUser.id,
                     type: 'co',
-                    reward_point: 100, // Contoh poin
+                    reward_point: rewardPoint, // Contoh poin
                 }
             });
         }

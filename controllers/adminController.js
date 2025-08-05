@@ -268,3 +268,35 @@ exports.rejectUser = async (req, res) => {
         res.status(500).json({ message: 'Gagal menolak user.' });
     }
 };
+
+exports.getSettings = async (req, res) => {
+    try {
+        const settings = await prisma.setting.findMany();
+        res.status(200).json({ data: settings });
+    } catch (error) {
+        res.status(500).json({ message: "Gagal mengambil pengaturan." });
+    }
+};
+
+exports.updateSettings = async (req, res) => {
+    // Harapkan body berupa array: [{ key: 'referral_reward_co' || 'referral_reward_mitra', value: 'new_value' }]
+    const settingsToUpdate = req.body; 
+
+    if (!Array.isArray(settingsToUpdate)) {
+        return res.status(400).json({ message: "Format input tidak valid." });
+    }
+
+    try {
+        await prisma.$transaction(
+            settingsToUpdate.map(setting => 
+                prisma.setting.update({
+                    where: { key: setting.key },
+                    data: { value: setting.value },
+                })
+            )
+        );
+        res.status(200).json({ message: "Pengaturan berhasil diperbarui." });
+    } catch (error) {
+        res.status(500).json({ message: "Gagal memperbarui pengaturan." });
+    }
+};
