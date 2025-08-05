@@ -7,6 +7,83 @@ function generateReferralCode(length = 8) {
 }
 
 
+
+/**
+ * Mengambil daftar dan total pengguna (CO atau Mitra) dengan status 'pending'.
+ * Secara dinamis menyertakan informasi referrer jika ada.
+ */
+exports.getPendingUsers = async (req, res) => {
+    // Tentukan role berdasarkan path URL (misal: '/co/pending' -> 'co')
+    const role = req.path.includes('/co/') ? 'co' : 'mitra';
+
+    try {
+        const whereClause = {
+            role: role,
+            status: 'pending',
+            // Pastikan profil yang sesuai ada
+            [role === 'co' ? 'coProfile' : 'mitraProfile']: {
+                isNot: null
+            }
+        };
+
+        const [users, total] = await prisma.$transaction([
+            prisma.user.findMany({
+                where: whereClause,
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                    status: true,
+                    created_at: true,
+                    coProfile: role === 'co', // Hanya sertakan coProfile jika role = 'co'
+                    mitraProfile: role === 'mitra', // Hanya sertakan mitraProfile jika role = 'mitra'
+                    
+                    // --- PERUBAHAN UTAMA DI SINI ---
+                    // Ambil data referral yang terhubung dengan user ini
+                    referred: {
+                        select: {
+                            // Dari data referral, ambil data si pemberi referral
+                            referrer: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    email: true
+                                }
+                            }
+                        }
+                    }
+                }
+            }),
+            prisma.user.count({ where: whereClause })
+        ]);
+        
+        // Format ulang data agar lebih mudah digunakan di frontend
+        const formattedData = users.map(user => {
+            const { referred, ...restOfUser } = user;
+            // Jika ada data referral, ambil objek referrer-nya. Jika tidak, set ke null.
+            const referrerInfo = (referred && referred.length > 0)
+                ? referred[0].referrer
+                : null;
+            
+            return {
+                ...restOfUser,
+                referrer: referrerInfo // Tambahkan properti 'referrer'
+            };
+        });
+
+        res.status(200).json({
+            message: `Data ${role.toUpperCase()} pending berhasil diambil.`,
+            total,
+            data: formattedData
+        });
+    } catch (error) {
+        console.error(`Error fetching pending ${role.toUpperCase()}:`, error);
+        res.status(500).json({ message: "Terjadi kesalahan pada server." });
+    }
+};
+
+
 /**
  * Mengambil daftar dan total Captain Officer (CO) yang sudah terverifikasi.
  * Kriteria: role = 'co', status = 'approved'
@@ -48,46 +125,6 @@ exports.getVerifiedCo = async (req, res) => {
 };
 
 /**
- * Mengambil daftar dan total Captain Officer (CO) yang menunggu persetujuan.
- * Kriteria: role = 'co', status = 'pending'
- */
-exports.getPendingCo = async (req, res) => {
-    try {
-        const [pendingCo, total] = await prisma.$transaction([
-            prisma.user.findMany({
-                where: {
-                    role: 'co',
-                    status: 'pending'
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    phone: true,
-                    created_at: true,
-                    coProfile: true // Sertakan profil lengkapnya
-                }
-            }),
-            prisma.user.count({
-                where: {
-                    role: 'co',
-                    status: 'pending'
-                }
-            })
-        ]);
-
-        res.status(200).json({
-            message: "Data CO pending berhasil diambil.",
-            total,
-            data: pendingCo
-        });
-    } catch (error) {
-        console.error("Error fetching pending COs:", error);
-        res.status(500).json({ message: "Terjadi kesalahan pada server." });
-    }
-};
-
-/**
  * Mengambil daftar dan total Mitra yang terdaftar.
  * Kriteria: role = 'mitra' dan memiliki profil
  */
@@ -119,52 +156,6 @@ exports.getRegisteredMitra = async (req, res) => {
                         isNot: null
                     },
                     status: 'approved'
-                }
-            })
-        ]);
-        
-        res.status(200).json({
-            message: "Data Mitra terdaftar berhasil diambil.",
-            total,
-            data: mitras
-        });
-    } catch (error) {
-        console.error("Error fetching registered Mitras:", error);
-        res.status(500).json({ message: "Terjadi kesalahan pada server." });
-    }
-};
-/**
- * Mengambil daftar dan total Mitra yang memiliki status pending.
- * Kriteria: role = 'mitra' dan memiliki profil
- */
-exports.getPendingMitra = async (req, res) => {
-    try {
-        const [mitras, total] = await prisma.$transaction([
-            prisma.user.findMany({
-                where: {
-                    role: 'mitra',
-                     mitraProfile: {
-                        isNot: null // Memastikan profil mitra ada
-                    },
-                    status: 'pending',
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    phone: true,
-                    status: true,
-                    created_at: true,
-                    mitraProfile: true,
-                }
-            }),
-            prisma.user.count({
-                where: {
-                    role: 'mitra',
-                     mitraProfile: {
-                        isNot: null // Memastikan profil mitra ada
-                    },
-                    status: 'pending'
                 }
             })
         ]);

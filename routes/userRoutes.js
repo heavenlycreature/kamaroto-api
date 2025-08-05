@@ -20,6 +20,8 @@ router.get('/address/coordinates', addressController.getCoordinates);
 // Update CO profile (CO only)
 router.put('/captain/profile/edit', authenticateToken, authorizeRoles('co'), coController.updateCaptainProfile);
 router.get('/captain/profile', authenticateToken, authorizeRoles('co'), coController.getCaptainProfile);
+router.get('/captain/referrals', authenticateToken, authorizeRoles('co'), coController.getReferredUsers);
+router.get('/captain/referrals/stats', authenticateToken, authorizeRoles('co'), coController.getReferralStats);
 
 // Update Mitra profile (Mitra only)
 router.put('/mitra/profile/edit', authenticateToken, authorizeRoles('mitra'), mitraController.updateMitraProfile);

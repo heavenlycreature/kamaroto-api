@@ -11,12 +11,12 @@ router.use(authorizeRoles('admin')); // Lapis kedua: Pastikan user yang login me
 // Rute ini sekarang secara otomatis aman dan hanya bisa diakses oleh admin.
 // Captain Officer (CO) Route List
 router.get('/co/verified', adminController.getVerifiedCo);
-router.get('/co/pending', adminController.getPendingCo);
+router.get('/co/pending', adminController.getPendingUsers);
 router.put('/co/approved/:userId', adminController.approveUser);
 router.put('/co/rejected/:userId', adminController.rejectUser);
 // Mitra Route List
 router.get('/mitra/registered', adminController.getRegisteredMitra);
-router.get('/mitra/pending', adminController.getPendingMitra);
+router.get('/mitra/pending', adminController.getPendingUsers);
 router.put('/mitra/approved/:userId', adminController.approveUser);
 router.put('/mitra/rejected/:userId', adminController.rejectUser);
 

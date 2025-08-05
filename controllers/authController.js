@@ -10,8 +10,10 @@ const prisma = new PrismaClient();
 async function validateReferral(referralCode) {
     if (!referralCode) return null;
 
+    const sanitizedCode = referralCode.trim().toLowerCase();
+
     const referrerProfile = await prisma.coProfile.findUnique({
-        where: { referral_code: referralCode },
+        where: { referral_code: sanitizedCode },
         include: { user: true },
     });
 
@@ -99,7 +101,6 @@ exports.registerMitra = async (req, res) => {
  * Mendaftarkan user CO (Credit Officer) baru beserta profilnya dalam satu transaksi.
  */
 exports.registerCo = async (req, res) => {
-  // Data teks ada di req.body
   const {
     name, email, password, phone, nik,
     birth_place, birth_date, gender,
@@ -112,7 +113,7 @@ exports.registerCo = async (req, res) => {
     return res.status(400).json({ message: 'Gambar selfie wajib diunggah.' });
   }
 
-  const birthDateObject = new Date(birth_date); // Ubah string menjadi objek Date
+  const birthDateObject = new Date(`${birth_date}T00:00:00.000Z`); // Ubah string menjadi objek Date
     if (isNaN(birthDateObject.getTime())) {
       // Jika string tidak valid (misal: "ini-bukan-tanggal"), kirim error yang jelas
       return res.status(400).json({ 
@@ -185,7 +186,6 @@ exports.registerCo = async (req, res) => {
     }
 
     // 2. Kirim respons error yang sesuai ke frontend
-    console.error('Registration error:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const field = error.meta.target[0];
         return res.status(400).json({
@@ -193,6 +193,9 @@ exports.registerCo = async (req, res) => {
             field: field 
         });
     }
+     if (error.message.includes("Kode referral tidak valid")) {
+            return res.status(400).json({ message: error.message, field: 'referral_code' });
+        }
     
     res.status(500).json({ message: 'Terjadi kesalahan pada server saat registrasi.' });
   }

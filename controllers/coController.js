@@ -120,3 +120,95 @@ exports.updateCaptainProfile = async (req, res) => {
         res.status(500).json({ message: 'Terjadi kesalahan pada server saat memperbarui profil.' });
     }
 };
+
+/**
+ * Mengambil daftar pengguna (CO & Mitra) yang berhasil direferensikan
+ * oleh CO yang sedang login.
+ */
+exports.getReferredUsers = async (req, res) => {
+    // Ambil ID CO yang sedang login dari token JWT
+    const referrerId = req.user.id;
+
+    try {
+        // Cari semua entri di tabel Referral di mana CO ini adalah 'referrer'
+        const referrals = await prisma.referral.findMany({
+            where: {
+                referrer_id: referrerId,
+            },
+            // Sertakan data lengkap dari pengguna yang direferensikan ('referred')
+            include: {
+                referred: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        phone: true,
+                        role: true,
+                        status: true,
+                        created_at: true,
+                    }
+                }
+            },
+            orderBy: {
+                created_at: 'desc' // Tampilkan yang terbaru di atas
+            }
+        });
+
+        // Format data agar lebih mudah dibaca oleh frontend
+        const referredUsers = referrals.map(referral => ({
+            ...referral.referred, // Ambil semua data user yang direferensikan
+            referral_date: referral.created_at,
+            reward_point: referral.reward_point,
+            reward_status: referral.rewarded ? 'Diberikan' : 'Menunggu Persetujuan'
+        }));
+
+        res.status(200).json({
+            message: "Data referral berhasil diambil.",
+            data: referredUsers
+        });
+
+    } catch (error) {
+        console.error("Error fetching referred users:", error);
+        res.status(500).json({ message: "Terjadi kesalahan pada server." });
+    }
+};
+
+/**
+ * Mengambil statistik ringkas untuk CO yang sedang login.
+ * Contoh: Total Poin, Total Referral Sukses.
+ */
+exports.getReferralStats = async (req, res) => {
+    const referrerId = req.user.id;
+    try {
+        // Hitung total poin dari tabel Point
+        const totalPoints = await prisma.point.aggregate({
+            _sum: {
+                amount: true,
+            },
+            where: {
+                user_id: referrerId,
+                // Anda bisa filter berdasarkan tipe jika perlu, misal: type: 'referral'
+            },
+        });
+
+        // Hitung total referral yang berhasil (sudah di-approve dan diberi reward)
+        const successfulReferrals = await prisma.referral.count({
+            where: {
+                referrer_id: referrerId,
+                rewarded: true,
+            },
+        });
+
+        res.status(200).json({
+            message: "Statistik referral berhasil diambil.",
+            data: {
+                total_points: totalPoints._sum.amount || 0,
+                successful_referrals: successfulReferrals,
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching referral stats:", error);
+        res.status(500).json({ message: "Terjadi kesalahan pada server." });
+    }
+};
