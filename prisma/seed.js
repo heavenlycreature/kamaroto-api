@@ -14,7 +14,7 @@ async function main() {
         // Jika tidak ada argumen, jalankan semua seeder
         console.log('Menjalankan semua seeder...');
         await seedAdmin(prisma);
-        // await seedAddress(prisma); // Aktifkan jika ingin menjalankan seed alamat
+        await seedAddress(prisma); // Aktifkan jika ingin menjalankan seed alamat
     } else {
         // Jalankan seeder berdasarkan argumen
         for (const arg of args) {

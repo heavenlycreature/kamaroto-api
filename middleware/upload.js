@@ -6,8 +6,17 @@ const fs = require('fs');
 // Konfigurasi storage untuk penyimpanan lokal
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = 'public/uploads/selfies';
+     let uploadPath = 'public/uploads/others';
     // Pastikan direktori ada, jika tidak, buat direktorinya
+    // Cek URL request untuk menentukan folder tujuan
+    if (req.originalUrl.includes('/register/captain') || req.originalUrl.includes('/resubmit')) {
+      // Jika dari registrasi/resubmit Captain (CO), simpan di 'selfies'
+      uploadPath = 'public/uploads/selfies';
+    } else if (req.originalUrl.includes('/register/mitra')) {
+      // Jika dari registrasi Mitra, simpan di 'stores'
+      uploadPath = 'public/uploads/stores';
+    }
+    
     fs.mkdirSync(uploadPath, { recursive: true });
     cb(null, uploadPath);
   },

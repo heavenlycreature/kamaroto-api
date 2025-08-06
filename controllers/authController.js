@@ -3,6 +3,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path'); 
+const crypto = require('crypto');
+const { sendVerificationEmail } = require('../utils/mailer');
 
 const prisma = new PrismaClient();
 
@@ -60,7 +62,7 @@ exports.registerMitra = async (req, res) => {
     // Gunakan nested write untuk membuat User dan MitraProfile sekaligus (transaksional)
     const newUser = await prisma.user.create({
       data: {
-        name: owner_email,
+        name: owner_name,
         email: owner_email,
         password: hashedPassword,
         phone: owner_phone,
@@ -100,6 +102,19 @@ exports.registerMitra = async (req, res) => {
                 }
             });
       }
+      const verificationToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 3600 * 1000);
+
+        await prisma.verificationToken.create({
+            data: {
+                token: verificationToken,
+                type: 'EMAIL_VERIFICATION',
+                expires_at: expiresAt,
+                user_id: newUser.id,
+            }
+        });
+
+        await sendVerificationEmail(newUser.email, verificationToken);
 
     res.status(201).json({ message: 'Pendaftaran mitra berhasil, menunggu persetujuan admin.', user: newUser });
 
@@ -197,6 +212,20 @@ exports.registerCo = async (req, res) => {
                 }
             });
         }
+
+        const verificationToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 3600 * 1000);
+
+        await prisma.verificationToken.create({
+            data: {
+                token: verificationToken,
+                type: 'EMAIL_VERIFICATION', // Gunakan tipe yang baru kita buat
+                expires_at: expiresAt,
+                user_id: newUser.id,
+            }
+        });
+
+        await sendVerificationEmail(newUser.email, verificationToken);
 
     res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
 
@@ -431,8 +460,6 @@ exports.loginUser = async (req, res) => {
             return res.status(401).json({ message: 'Email atau password salah.' });
         }
 
-        // --- PERUBAHAN UTAMA DIMULAI DI SINI ---
-
         // 3. Buat token terlebih dahulu, berdasarkan status
         let tokenScope = 'full'; // Default scope
         if (user.status === 'rejected' && user.resubmit_allowed) {
@@ -471,5 +498,45 @@ exports.loginUser = async (req, res) => {
         return res.status(500).json({ 
             message: 'Terjadi kesalahan saat login.',
         });
+    }
+};
+
+exports.verifyEmail = async (req, res) => {
+    const { token } = req.query; // Ambil token dari URL query (?token=...)
+
+    if (!token) {
+        return res.status(400).json({ message: "Token tidak ditemukan." });
+    }
+
+    try {
+        // Cari token di DB yang belum kedaluwarsa
+        const verificationToken = await prisma.verificationToken.findFirst({
+            where: {
+                token: token,
+                expires_at: {
+                    gt: new Date(), // 'gt' = greater than (lebih besar dari sekarang)
+                },
+            },
+        });
+
+        if (!verificationToken) {
+            return res.status(400).json({ message: "Token tidak valid atau sudah kedaluwarsa." });
+        }
+
+        // Jika token valid, update user dan hapus token
+        await prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: verificationToken.user_id },
+                data: { is_verified: true, status: 'active' }, // Set user menjadi verified dan aktif
+            });
+            await tx.verificationToken.delete({
+                where: { id: verificationToken.id },
+            });
+        });
+
+        res.status(200).json({ message: "Email berhasil diverifikasi! Anda sekarang bisa login." });
+    } catch (error) {
+        console.error("Email verification error:", error);
+        res.status(500).json({ message: "Terjadi kesalahan saat verifikasi email." });
     }
 };

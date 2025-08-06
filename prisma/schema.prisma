@@ -20,14 +20,17 @@ model User {
   rejection_reason  String?  @db.Text
   resubmitted_at  DateTime? @db.Timestamptz(6)
   resubmit_allowed  Boolean @default(true) 
-  phone      String   @db.VarChar(20)
+  phone      String   @unique @db.VarChar(20)
   created_at DateTime @default(now()) @db.Timestamptz(6)
+  is_verified Boolean @default(false)
+  
 
   coProfile    CoProfile?
   mitraProfile MitraProfile?
 
   referred     Referral[] @relation("ReferredUsers")
   referralsMade Referral[] @relation("ReferringUsers")
+  verificationTokens VerificationToken[]
   points        Point[]
 }
 
@@ -65,11 +68,11 @@ model MitraProfile {
   id                        Int      @id @default(autoincrement())
   user_id                   Int      @unique
   pic_name                  String   @db.VarChar(100)
-  pic_phone                 String   @db.VarChar(20)
+  pic_phone                 String   @unique @db.VarChar(20)
   pic_email                 String   @db.VarChar(100)
   pic_status                PicStatus
   owner_name                String   @db.VarChar(100)
-  owner_phone               String   @db.VarChar(20)
+  owner_phone               String   @unique @db.VarChar(20)
   owner_email               String   @db.VarChar(100)
   owner_ktp                 String   @db.VarChar(50)
   owner_address_province    String   @db.VarChar(100)
@@ -151,6 +154,19 @@ model Setting {
   @@map("settings")
 }
 
+model VerificationToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  type       TokenType 
+  expires_at DateTime
+  user_id    Int
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("verification_tokens")
+}
+
 
 enum PointType {
   referral
@@ -191,4 +207,9 @@ enum BusinessType {
   insurance_consultant
   pembiayaan
   biro_jasa
+}
+
+enum TokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
 }
