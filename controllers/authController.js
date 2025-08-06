@@ -527,14 +527,14 @@ exports.verifyEmail = async (req, res) => {
         await prisma.$transaction(async (tx) => {
             await tx.user.update({
                 where: { id: verificationToken.user_id },
-                data: { is_verified: true, status: 'active' }, // Set user menjadi verified dan aktif
+                data: { is_verified: true}, 
             });
             await tx.verificationToken.delete({
                 where: { id: verificationToken.id },
             });
         });
 
-        res.status(200).json({ message: "Email berhasil diverifikasi! Anda sekarang bisa login." });
+        res.status(200).json({ message: "Email berhasil diverifikasi! Anda selangkah lebih dekat agar data diverifikasi admin" });
     } catch (error) {
         console.error("Email verification error:", error);
         res.status(500).json({ message: "Terjadi kesalahan saat verifikasi email." });

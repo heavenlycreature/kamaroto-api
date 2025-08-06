@@ -31,7 +31,6 @@ const sendVerificationEmail = async (to, token) => {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`Email verifikasi terkirim ke: ${to}`);
     } catch (error) {
         console.error(`Gagal mengirim email ke ${to}:`, error);
     }
