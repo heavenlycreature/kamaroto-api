@@ -22,7 +22,7 @@ model User {
   resubmit_allowed  Boolean @default(true) 
   phone      String   @unique @db.VarChar(20)
   created_at DateTime @default(now()) @db.Timestamptz(6)
-  is_verified Boolean @default(false)
+  email_is_verified Boolean @default(false)
   
 
   coProfile    CoProfile?

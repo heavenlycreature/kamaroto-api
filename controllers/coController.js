@@ -145,6 +145,7 @@ exports.getReferredUsers = async (req, res) => {
                         phone: true,
                         role: true,
                         status: true,
+                        email_is_verified: true, // Ambil status verifikasi email
                         created_at: true,
                     }
                 }

@@ -35,6 +35,7 @@ exports.getPendingUsers = async (req, res) => {
                     email: true,
                     phone: true,
                     status: true,
+                    email_is_verified: true, // Ambil status verifikasi email
                     created_at: true,
                     coProfile: role === 'co', // Hanya sertakan coProfile jika role = 'co'
                     mitraProfile: role === 'mitra', // Hanya sertakan mitraProfile jika role = 'mitra'
