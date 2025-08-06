@@ -36,7 +36,7 @@ async function getSettingValue(key) {
 exports.registerMitra = async (req, res) => {
   // 1. Ambil semua data dari body (user & profile)
   const {
-    name, email, password, phone, // Data untuk tabel 'users'
+    password, // Data untuk tabel 'users'
     // Data untuk tabel 'mitra_profiles'
     referral_code, pic_name, pic_phone, pic_email, pic_status,
     owner_name, owner_phone, owner_email, owner_ktp,
@@ -46,6 +46,12 @@ exports.registerMitra = async (req, res) => {
     business_duration, social_media_platform, social_media_account, latitude, longitude
   } = req.body;
 
+   if (!req.file) {
+    return res.status(400).json({ message: 'Gambar selfie wajib diunggah.' });
+  }
+   
+  const store_images = `/uploads/stores/${req.file.filename}`;
+
   try {
     // Hash password sebelum disimpan
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -54,10 +60,10 @@ exports.registerMitra = async (req, res) => {
     // Gunakan nested write untuk membuat User dan MitraProfile sekaligus (transaksional)
     const newUser = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: owner_email,
+        email: owner_email,
         password: hashedPassword,
-        phone,
+        phone: owner_phone,
         role: 'mitra',
         status: 'pending', // Status default adalah pending
         mitraProfile: {
@@ -67,7 +73,10 @@ exports.registerMitra = async (req, res) => {
             owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
             business_type, business_entity, business_name,
             business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
-            business_duration, social_media_platform, social_media_account, latitude, longitude
+            business_duration, social_media_platform, social_media_account,
+            latitude: parseFloat(latitude), 
+            longitude: parseFloat(longitude),
+            store_images 
           },
         },
       },
@@ -95,6 +104,16 @@ exports.registerMitra = async (req, res) => {
     res.status(201).json({ message: 'Pendaftaran mitra berhasil, menunggu persetujuan admin.', user: newUser });
 
   } catch (error) {
+
+    if (req.file) {
+      try {
+        await fs.unlink(req.file.path); // req.file.path berisi path lengkap ke file
+        console.log(`File ${req.file.filename} dihapus karena registrasi gagal.`);
+      } catch (unlinkError) {
+        // Jika penghapusan file juga gagal, cukup log error-nya
+        console.error(`Error saat menghapus file ${req.file.filename}:`, unlinkError);
+      }
+    }
     // Tangani error jika email sudah ada (Prisma error code P2002)
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return res.status(400).json({ message: 'Email ini sudah terdaftar.' });

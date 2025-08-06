@@ -92,6 +92,7 @@ model MitraProfile {
   approved_at               DateTime? @db.Timestamptz(6)
   latitude                  Float?
   longitude                 Float?
+  store_images              String  @db.Text
 
 
   user User @relation(fields: [user_id], references: [id])
