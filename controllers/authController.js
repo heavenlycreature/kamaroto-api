@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path'); 
 const crypto = require('crypto');
-const { sendVerificationEmail } = require('../utils/mailer');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/mailer');
 
 const prisma = new PrismaClient();
 
@@ -538,5 +538,78 @@ exports.verifyEmail = async (req, res) => {
     } catch (error) {
         console.error("Email verification error:", error);
         res.status(500).json({ message: "Terjadi kesalahan saat verifikasi email." });
+    }
+};
+
+exports.forgotPassword = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        // PENTING: Jangan beri tahu jika user tidak ditemukan untuk alasan keamanan
+        // Cukup kirim respons sukses yang sama.
+        if (user) {
+            const token = crypto.randomUUID();
+            const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 menit
+
+            await prisma.verificationToken.create({
+                data: {
+                    token: token,
+                    type: 'PASSWORD_RESET', // Gunakan tipe yang sudah kita siapkan
+                    expires_at: expiresAt,
+                    user_id: user.id,
+                }
+            });
+
+            await sendPasswordResetEmail(user.email, token);
+        }
+
+        res.status(200).json({ message: "Jika email Anda terdaftar, link untuk mereset password telah dikirim." });
+    } catch (error) {
+        console.error("Forgot password error:", error);
+        // Kirim respons generik bahkan jika terjadi error
+        res.status(200).json({ message: "Jika email Anda terdaftar, link untuk mereset password telah dikirim." });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+        return res.status(400).json({ message: "Token dan password baru dibutuhkan." });
+    }
+
+    try {
+        // 1. Cari token yang valid dan sesuai tipenya
+        const resetToken = await prisma.verificationToken.findFirst({
+            where: {
+                token: token,
+                type: 'PASSWORD_RESET',
+                expires_at: { gt: new Date() }
+            }
+        });
+
+        if (!resetToken) {
+            return res.status(400).json({ message: "Token tidak valid atau sudah kedaluwarsa." });
+        }
+
+        // 2. Hash password baru
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // 3. Update password user dan hapus token dalam satu transaksi
+        await prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: resetToken.user_id },
+                data: { password: hashedPassword }
+            });
+            await tx.verificationToken.delete({
+                where: { id: resetToken.id }
+            });
+        });
+
+        res.status(200).json({ message: "Password berhasil diperbarui. Silakan login." });
+    } catch (error) {
+        console.error("Reset password error:", error);
+        res.status(500).json({ message: "Gagal mereset password." });
     }
 };
