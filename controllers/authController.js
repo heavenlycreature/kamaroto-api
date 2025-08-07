@@ -60,58 +60,62 @@ exports.registerMitra = async (req, res) => {
     
     const referrerId = await validateReferral(referral_code);
     // Gunakan nested write untuk membuat User dan MitraProfile sekaligus (transaksional)
-    const newUser = await prisma.user.create({
-      data: {
-        name: owner_name,
-        email: owner_email,
-        password: hashedPassword,
-        phone: owner_phone,
-        role: 'mitra',
-        status: 'pending', // Status default adalah pending
-        mitraProfile: {
-          create: {
-            pic_name, pic_phone, pic_email, pic_status,
-            owner_name, owner_phone, owner_email, owner_ktp,
-            owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
-            business_type, business_entity, business_name,
-            business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
-            business_duration, social_media_platform, social_media_account,
-            latitude: parseFloat(latitude), 
-            longitude: parseFloat(longitude),
-            store_images 
-          },
-        },
-      },
-      // Pilih data yang ingin dikembalikan
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        status: true
-      }
-    });
+    let verificationToken; 
 
-    if (referrerId) {
-      const rewardPoint = await getSettingValue('referral_reward_co');
-            await prisma.referral.create({
+        const newUser = await prisma.$transaction(async (tx) => {
+            // 1. Buat User dan Profil di dalam transaksi
+            const createdUser = await tx.user.create({
                 data: {
-                    referrer_id: referrerId,
-                    referred_id: newUser.id,
-                    type: 'co',
-                    reward_point: rewardPoint,
+                    name: owner_name,
+                    email: owner_email,
+                    password: hashedPassword,
+                    phone: owner_phone,
+                    role: 'mitra',
+                    status: 'pending',
+                    mitraProfile: {
+                        create: {
+                            pic_name, pic_phone, pic_email, pic_status,
+                            owner_name, owner_phone, owner_email, owner_ktp,
+                            owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
+                            business_type, business_entity, business_name,
+                            business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
+                            business_duration, social_media_platform, social_media_account,
+                            latitude: parseFloat(latitude), 
+                            longitude: parseFloat(longitude),
+                            store_images: [store_images] // Simpan sebagai array
+                        },
+                    },
+                },
+                select: { id: true, email: true, role: true, status: true, name: true }
+            });
+
+            // 2. Buat entri Referral di dalam transaksi yang sama
+            if (referrerId) {
+                // PERBAIKAN: Gunakan key dan tipe yang benar untuk Mitra
+                const rewardPoint = await getSettingValue('referral_reward_mitra');
+                await tx.referral.create({
+                    data: {
+                        referrer_id: referrerId,
+                        referred_id: createdUser.id,
+                        type: 'mitra', // <-- Diperbaiki dari 'co'
+                        reward_point: rewardPoint,
+                    }
+                });
+            }
+
+            // 3. Buat token verifikasi di dalam transaksi yang sama
+            verificationToken = crypto.randomUUID();
+            const expiresAt = new Date(Date.now() + 3600 * 1000);
+            await tx.verificationToken.create({
+                data: {
+                    token: verificationToken,
+                    type: 'EMAIL_VERIFICATION',
+                    expires_at: expiresAt,
+                    user_id: createdUser.id,
                 }
             });
-      }
-      const verificationToken = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 3600 * 1000);
 
-        await prisma.verificationToken.create({
-            data: {
-                token: verificationToken,
-                type: 'EMAIL_VERIFICATION',
-                expires_at: expiresAt,
-                user_id: newUser.id,
-            }
+            return createdUser; // Kembalikan user yang baru dibuat dari transaksi
         });
 
         await sendVerificationEmail(newUser.email, verificationToken);
@@ -170,65 +174,58 @@ exports.registerCo = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const referrerId = await validateReferral(referral_code);
 
-    const newUser = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        phone,
-        role: 'co',
-        status: 'pending',
-        coProfile: {
-          create: {
-            name,
-            email,
-            nik,
-            birth_place,
-            birth_date: birthDateObject,
-            gender,
-            address_province,
-            address_city,
-            address_subdistrict,
-            address_village,
-            address_detail,
-            job,
-            marital_status,
-            education,
-            selfie_url: selfie_url,
-            latitude: parseFloat(latitude),
-            longitude: parseFloat(longitude),
-          },
-        },
-      },
-      select: { id: true, email: true, status: true }
-    });
-     if (referrerId) {
-      const rewardPoint = await getSettingValue('referral_reward_co');
-            await prisma.referral.create({
+    const newUser = await prisma.$transaction(async (tx) => {
+            // 1. Buat User dan Profil di dalam transaksi
+            const createdUser = await tx.user.create({
                 data: {
-                    referrer_id: referrerId,
-                    referred_id: newUser.id,
-                    type: 'co',
-                    reward_point: rewardPoint, // Contoh poin
+                    name, email, password: hashedPassword, phone,
+                    role: 'co', status: 'pending',
+                    coProfile: {
+                        create: {
+                            name, email, nik, birth_place,
+                            birth_date: birthDateObject,
+                            gender, address_province, address_city, address_subdistrict, address_village, address_detail,
+                            job, marital_status, education, selfie_url,
+                            latitude: parseFloat(latitude),
+                            longitude: parseFloat(longitude),
+                        },
+                    },
+                },
+                select: { id: true, email: true, status: true, name: true, role: true } // Ambil data untuk notifikasi
+            });
+
+            // 2. Buat entri Referral di dalam transaksi yang sama
+            if (referrerId) {
+                const rewardPoint = await getSettingValue('referral_reward_co');
+                await tx.referral.create({
+                    data: {
+                        referrer_id: referrerId,
+                        referred_id: createdUser.id,
+                        type: 'co',
+                        reward_point: rewardPoint,
+                    }
+                });
+            }
+
+            // 3. Buat token verifikasi di dalam transaksi yang sama
+            const verificationToken = crypto.randomUUID();
+            const expiresAt = new Date(Date.now() + 3600 * 1000);
+            await tx.verificationToken.create({
+                data: {
+                    token: verificationToken,
+                    type: 'EMAIL_VERIFICATION',
+                    expires_at: expiresAt,
+                    user_id: createdUser.id,
                 }
             });
-        }
 
-        const verificationToken = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 3600 * 1000);
+            // Kirim email setelah transaksi (di luar, tapi setelah data user didapat)
+            await sendVerificationEmail(createdUser.email, verificationToken);
+            sendNewRegistrationNotification(createdUser);
 
-        await prisma.verificationToken.create({
-            data: {
-                token: verificationToken,
-                type: 'EMAIL_VERIFICATION', // Gunakan tipe yang baru kita buat
-                expires_at: expiresAt,
-                user_id: newUser.id,
-            }
+            return createdUser; // Kembalikan user yang baru dibuat
         });
-
-        await sendVerificationEmail(newUser.email, verificationToken);
-        sendNewRegistrationNotification(newUser);
-
+   
     res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
 
   } catch (error) {
@@ -255,7 +252,7 @@ exports.registerCo = async (req, res) => {
             return res.status(400).json({ message: error.message, field: 'referral_code' });
         }
     
-    res.status(500).json({ message: 'Terjadi kesalahan pada server saat registrasi.' });
+    res.status(500).json({ message: `Terjadi kesalahan pada server saat registrasi. ${error.message} ` });
   }
 };
 
@@ -529,7 +526,7 @@ exports.verifyEmail = async (req, res) => {
         await prisma.$transaction(async (tx) => {
             await tx.user.update({
                 where: { id: verificationToken.user_id },
-                data: { is_verified: true}, 
+                data: { email_is_verified: true}, 
             });
             await tx.verificationToken.delete({
                 where: { id: verificationToken.id },
