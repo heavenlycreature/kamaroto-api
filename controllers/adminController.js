@@ -259,6 +259,15 @@ exports.rejectUser = async (req, res) => {
     }
 
     try {
+        const user = await prisma.user.findUnique({ 
+            where: { id: parseInt(userId) } 
+        });
+
+        // Tambahkan validasi jika user tidak ditemukan
+        if (!user) {
+            return res.status(404).json({ message: "User tidak ditemukan." });
+        }
+
         await prisma.user.update({
             where: { id: parseInt(userId) },
             data: {
