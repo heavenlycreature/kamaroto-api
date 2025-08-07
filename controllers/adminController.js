@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { sendApprovalEmail, sendRejectionEmail } = require('../utils/mailer')
 
 
 function generateReferralCode(length = 8) {
@@ -196,7 +197,6 @@ exports.approveUser = async (req, res) => {
         }
 
         
-        // Jalankan update pada User dan Profil dalam satu transaksi
         await prisma.$transaction(async (tx) => {
             await tx.user.update({
                 where: { id: parseInt(userId) },
@@ -212,7 +212,7 @@ exports.approveUser = async (req, res) => {
                         data: { referral_code: generateReferralCode() }
                     });
             }
-            // 3. Cek apakah user ini direferensikan oleh orang lain
+
             const referral = await tx.referral.findFirst({
                 where: {
                     referred_id: parseInt(userId),
@@ -234,8 +234,12 @@ exports.approveUser = async (req, res) => {
                 });
             }
         });
-        
 
+        try {
+            await sendApprovalEmail(user.email, user.name);
+        } catch (emailError) {
+            console.log(`Persetujuan user ID ${userId} berhasil, namun gagal mengirim email notifikasi.`);
+        }
         res.status(200).json({ message: `User ${user.role} dengan ID ${userId} berhasil disetujui.` });
     } catch (error) {
         console.error('Approve user error:', error);
@@ -263,6 +267,12 @@ exports.rejectUser = async (req, res) => {
                 resubmit_allowed,
             },
         });
+
+         try {
+            await sendRejectionEmail(user.email, user.name, rejection_reason, resubmit_allowed);
+        } catch (emailError) {
+            console.error(`Penolakan user ID ${userId} berhasil, namun gagal mengirim email notifikasi.`);
+        }
         res.status(200).json({ message: `User dengan ID ${userId} berhasil ditolak.` });
     } catch (error) {
         console.error('Reject user error:', error);
