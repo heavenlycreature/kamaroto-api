@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path'); 
 const crypto = require('crypto');
-const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/mailer');
+const { sendVerificationEmail, sendPasswordResetEmail, sendNewRegistrationNotification } = require('../utils/mailer');
 
 const prisma = new PrismaClient();
 
@@ -115,6 +115,7 @@ exports.registerMitra = async (req, res) => {
         });
 
         await sendVerificationEmail(newUser.email, verificationToken);
+        sendNewRegistrationNotification(newUser);
 
     res.status(201).json({ message: 'Pendaftaran mitra berhasil, menunggu persetujuan admin.', user: newUser });
 
@@ -226,6 +227,7 @@ exports.registerCo = async (req, res) => {
         });
 
         await sendVerificationEmail(newUser.email, verificationToken);
+        sendNewRegistrationNotification(newUser);
 
     res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
 
