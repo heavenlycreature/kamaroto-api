@@ -2,7 +2,7 @@ const { PrismaClient, Prisma } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
-const path = require('path'); 
+const path = require('path');
 const crypto = require('crypto');
 const { sendVerificationEmail, sendPasswordResetEmail, sendNewRegistrationNotification } = require('../utils/mailer');
 
@@ -36,31 +36,31 @@ async function getSettingValue(key) {
  * Mendaftarkan user Mitra baru beserta profilnya dalam satu transaksi.
  */
 exports.registerMitra = async (req, res) => {
-  // 1. Ambil semua data dari body (user & profile)
-  const {
-    password, // Data untuk tabel 'users'
-    // Data untuk tabel 'mitra_profiles'
-    referral_code, pic_name, pic_phone, pic_email, pic_status,
-    owner_name, owner_phone, owner_email, owner_ktp,
-    owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
-    business_type, business_entity, business_name,
-    business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
-    business_duration, social_media_platform, social_media_account, latitude, longitude
-  } = req.body;
+    // 1. Ambil semua data dari body (user & profile)
+    const {
+        password, // Data untuk tabel 'users'
+        // Data untuk tabel 'mitra_profiles'
+        referral_code, pic_name, pic_phone, pic_email, pic_status,
+        owner_name, owner_phone, owner_email, owner_ktp,
+        owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
+        business_type, business_entity, business_name,
+        business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
+        business_duration, social_media_platform, social_media_account, latitude, longitude
+    } = req.body;
 
-   if (!req.file) {
-    return res.status(400).json({ message: 'Gambar selfie wajib diunggah.' });
-  }
-   
-  const store_images = `/uploads/stores/${req.file.filename}`;
+    if (!req.file) {
+        return res.status(400).json({ message: 'Gambar selfie wajib diunggah.' });
+    }
 
-  try {
-    // Hash password sebelum disimpan
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    const referrerId = await validateReferral(referral_code);
-    // Gunakan nested write untuk membuat User dan MitraProfile sekaligus (transaksional)
-    let verificationToken; 
+    const store_images = `/uploads/stores/${req.file.filename}`;
+
+    try {
+        // Hash password sebelum disimpan
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const referrerId = await validateReferral(referral_code);
+        // Gunakan nested write untuk membuat User dan MitraProfile sekaligus (transaksional)
+        let verificationToken;
 
         const newUser = await prisma.$transaction(async (tx) => {
             // 1. Buat User dan Profil di dalam transaksi
@@ -80,9 +80,9 @@ exports.registerMitra = async (req, res) => {
                             business_type, business_entity, business_name,
                             business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
                             business_duration, social_media_platform, social_media_account,
-                            latitude: parseFloat(latitude), 
+                            latitude: parseFloat(latitude),
                             longitude: parseFloat(longitude),
-                            store_images: [store_images] // Simpan sebagai array
+                            store_images: store_images // Simpan sebagai array
                         },
                     },
                 },
@@ -121,60 +121,60 @@ exports.registerMitra = async (req, res) => {
         await sendVerificationEmail(newUser.email, verificationToken);
         sendNewRegistrationNotification(newUser);
 
-    res.status(201).json({ message: 'Pendaftaran mitra berhasil, menunggu persetujuan admin.', user: newUser });
+        res.status(201).json({ message: 'Pendaftaran mitra berhasil, menunggu persetujuan admin.', user: newUser });
 
-  } catch (error) {
+    } catch (error) {
 
-    if (req.file) {
-      try {
-        await fs.unlink(req.file.path); // req.file.path berisi path lengkap ke file
-        console.log(`File ${req.file.filename} dihapus karena registrasi gagal.`);
-      } catch (unlinkError) {
-        // Jika penghapusan file juga gagal, cukup log error-nya
-        console.error(`Error saat menghapus file ${req.file.filename}:`, unlinkError);
-      }
+        if (req.file) {
+            try {
+                await fs.unlink(req.file.path); // req.file.path berisi path lengkap ke file
+                console.log(`File ${req.file.filename} dihapus karena registrasi gagal.`);
+            } catch (unlinkError) {
+                // Jika penghapusan file juga gagal, cukup log error-nya
+                console.error(`Error saat menghapus file ${req.file.filename}:`, unlinkError);
+            }
+        }
+        // Tangani error jika email sudah ada (Prisma error code P2002)
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            return res.status(400).json({ message: 'Email ini sudah terdaftar.' });
+        }
+        console.error('Registration error:', error);
+        res.status(500).json({ message: 'Terjadi kesalahan pada server saat registrasi.' });
     }
-    // Tangani error jika email sudah ada (Prisma error code P2002)
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return res.status(400).json({ message: 'Email ini sudah terdaftar.' });
-    }
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan pada server saat registrasi.' });
-  }
 };
 
 /**
  * Mendaftarkan user CO (Credit Officer) baru beserta profilnya dalam satu transaksi.
  */
 exports.registerCo = async (req, res) => {
-  const {
-    name, email, password, phone, nik,
-    birth_place, birth_date, gender,
-    address_province, address_city, referral_code, address_subdistrict, address_village, address_detail,
-    job, marital_status, education, latitude, longitude 
-  } = req.body;
+    const {
+        name, email, password, phone, nik,
+        birth_place, birth_date, gender,
+        address_province, address_city, referral_code, address_subdistrict, address_village, address_detail,
+        job, marital_status, education, latitude, longitude
+    } = req.body;
 
-  // Cek apakah file diunggah
-  if (!req.file) {
-    return res.status(400).json({ message: 'Gambar selfie wajib diunggah.' });
-  }
-
-  const birthDateObject = new Date(`${birth_date}T00:00:00.000Z`); // Ubah string menjadi objek Date
-    if (isNaN(birthDateObject.getTime())) {
-      // Jika string tidak valid (misal: "ini-bukan-tanggal"), kirim error yang jelas
-      return res.status(400).json({ 
-          message: "Format tanggal lahir tidak valid. Harap gunakan format yang sesuai" 
-      });
+    // Cek apakah file diunggah
+    if (!req.file) {
+        return res.status(400).json({ message: 'Gambar selfie wajib diunggah.' });
     }
 
-  // Buat URL yang bisa diakses publik dari nama file
-  const selfie_url = `/uploads/selfies/${req.file.filename}`;
+    const birthDateObject = new Date(`${birth_date}T00:00:00.000Z`); // Ubah string menjadi objek Date
+    if (isNaN(birthDateObject.getTime())) {
+        // Jika string tidak valid (misal: "ini-bukan-tanggal"), kirim error yang jelas
+        return res.status(400).json({
+            message: "Format tanggal lahir tidak valid. Harap gunakan format yang sesuai"
+        });
+    }
 
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const referrerId = await validateReferral(referral_code);
+    // Buat URL yang bisa diakses publik dari nama file
+    const selfie_url = `/uploads/selfies/${req.file.filename}`;
 
-    const newUser = await prisma.$transaction(async (tx) => {
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const referrerId = await validateReferral(referral_code);
+
+        const newUser = await prisma.$transaction(async (tx) => {
             // 1. Buat User dan Profil di dalam transaksi
             const createdUser = await tx.user.create({
                 data: {
@@ -225,41 +225,41 @@ exports.registerCo = async (req, res) => {
 
             return createdUser; // Kembalikan user yang baru dibuat
         });
-   
-    res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
 
-  } catch (error) {
-    // 1. Hapus file yang sudah terlanjur di-upload jika ada error database
-    if (req.file) {
-      try {
-        await fs.unlink(req.file.path); // req.file.path berisi path lengkap ke file
-        console.log(`File ${req.file.filename} dihapus karena registrasi gagal.`);
-      } catch (unlinkError) {
-        // Jika penghapusan file juga gagal, cukup log error-nya
-        console.error(`Error saat menghapus file ${req.file.filename}:`, unlinkError);
-      }
-    }
+        res.status(201).json({ message: 'Pendaftaran CO berhasil, menunggu persetujuan admin.', user: newUser });
 
-    // 2. Kirim respons error yang sesuai ke frontend
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        const field = error.meta.target[0];
-        return res.status(400).json({
-            message: `Data pada kolom '${field}' sudah digunakan.`,
-            field: field 
-        });
-    }
-     if (error.message.includes("Kode referral tidak valid")) {
+    } catch (error) {
+        // 1. Hapus file yang sudah terlanjur di-upload jika ada error database
+        if (req.file) {
+            try {
+                await fs.unlink(req.file.path); // req.file.path berisi path lengkap ke file
+                console.log(`File ${req.file.filename} dihapus karena registrasi gagal.`);
+            } catch (unlinkError) {
+                // Jika penghapusan file juga gagal, cukup log error-nya
+                console.error(`Error saat menghapus file ${req.file.filename}:`, unlinkError);
+            }
+        }
+
+        // 2. Kirim respons error yang sesuai ke frontend
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            const field = error.meta.target[0];
+            return res.status(400).json({
+                message: `Data pada kolom '${field}' sudah digunakan.`,
+                field: field
+            });
+        }
+        if (error.message.includes("Kode referral tidak valid")) {
             return res.status(400).json({ message: error.message, field: 'referral_code' });
         }
-    
-    res.status(500).json({ message: `Terjadi kesalahan pada server saat registrasi. ${error.message} ` });
-  }
+
+        res.status(500).json({ message: `Terjadi kesalahan pada server saat registrasi. ${error.message} ` });
+    }
 };
 
 // Fungsi baru untuk mengambil profil lengkap user yang sedang login
 exports.getCurrentUserProfile = async (req, res) => {
     // SOLUSI: Ambil id dan role dari req.user (token), BUKAN req.params.
-    const { id: userId, role } = req.user; 
+    const { id: userId, role } = req.user;
 
     try {
         let includeClause = {};
@@ -305,117 +305,84 @@ exports.getCurrentUserProfile = async (req, res) => {
  */
 
 exports.resubmitProfile = async (req, res) => {
-    const { id: userId, role } = req.user; 
-    const allData = req.body; // Ambil semua data dari body
+    const { id: userId, role } = req.user;
+    const allData = req.body;
+
+    // Ambil file dari req.files (hasil dari upload.any())
+    const newFile = (req.files && req.files.length > 0) ? req.files[0] : null;
 
     try {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user || user.status !== 'rejected' || !user.resubmit_allowed) {
             return res.status(403).json({ message: 'Anda tidak diizinkan untuk melakukan pendaftaran ulang.' });
         }
-        
-        // --- SOLUSI: Pisahkan data untuk setiap tabel ---
-        
-        // 1. Siapkan data HANYA untuk tabel User
+
+        // 1. Siapkan data untuk tabel User, ambil dari field yang sesuai dengan rolenya
         const userDataForUpdate = {
-            name: allData.name,
-            email: allData.email,
-            phone: allData.phone,
+            name: role === 'co' ? allData.name : allData.owner_name,
+            email: role === 'co' ? allData.email : allData.owner_email,
+            phone: role === 'co' ? allData.phone : allData.owner_phone,
         };
 
-        // 2. Siapkan data HANYA untuk tabel Profil secara dinamis
         let profileDataForUpdate = {};
         let profileModel;
-         if (req.file && role === 'co') { // Hanya berlaku jika ada file BARU yang diupload
-            const existingProfile = await prisma.coProfile.findUnique({
-                where: { user_id: userId },
-                select: { selfie_url: true }
-            });
-
-            if (existingProfile && existingProfile.selfie_url) {
-                const oldFilePath = path.join(__dirname, '..', 'public', existingProfile.selfie_url);
-                try {
-                    await fs.unlink(oldFilePath);
-                    console.log(`File lama ${existingProfile.selfie_url} berhasil dihapus.`);
-                } catch (unlinkError) {
-                    console.error(`Gagal menghapus file lama: ${oldFilePath}`, unlinkError);
-                }
-            }
-        }
 
         if (role === 'co') {
             profileModel = prisma.coProfile;
             profileDataForUpdate = {
-                name: allData.name,
-                email: allData.email,
-                nik: allData.nik,
-                birth_place: allData.birth_place,
-                birth_date: new Date(allData.birth_date),
-                gender: allData.gender,
-                address_province: allData.address_province,
-                address_city: allData.address_city,
-                address_subdistrict: allData.address_subdistrict,
-                address_village: allData.address_village,
-                address_detail: allData.address_detail,
-                job: allData.job,
-                marital_status: allData.marital_status,
-                education: allData.education,
-                latitude: parseFloat(allData.latitude),
-                longitude: parseFloat(allData.longitude),
+                name: allData.name, email: allData.email, nik: allData.nik,
+                birth_place: allData.birth_place, birth_date: new Date(allData.birth_date),
+                gender: allData.gender, address_province: allData.address_province,
+                address_city: allData.address_city, address_subdistrict: allData.address_subdistrict,
+                address_village: allData.address_village, address_detail: allData.address_detail,
+                job: allData.job, marital_status: allData.marital_status, education: allData.education,
+                latitude: parseFloat(allData.latitude), longitude: parseFloat(allData.longitude),
             };
-            // Tambahkan file selfie baru jika diunggah
-            if (req.file) {
-                profileDataForUpdate.selfie_url = `/uploads/selfies/${req.file.filename}`;
+
+            if (newFile) {
+                const existingProfile = await prisma.coProfile.findUnique({ where: { user_id: userId }, select: { selfie_url: true } });
+                if (existingProfile?.selfie_url) {
+                    const oldFilePath = path.join(__dirname, '..', existingProfile.selfie_url.replace(/^\//, ''));
+                    try { await fs.unlink(oldFilePath); console.log(`File lama CO ${oldFilePath} berhasil dihapus.`); }
+                    catch (e) { console.error("Gagal hapus file lama CO:", e.message); }
+                }
+                profileDataForUpdate.selfie_url = `/uploads/selfies/${newFile.filename}`;
             }
+
         } else if (role === 'mitra') {
             profileModel = prisma.mitraProfile;
-             profileDataForUpdate = {
-                pic_name: allData.pic_name,
-                pic_phone: allData.pic_phone,
-                pic_email: allData.pic_email,
-                pic_status: allData.pic_status,
-                owner_name: allData.owner_name,
-                owner_phone: allData.owner_phone,
-                owner_email: allData.owner_email,
-                owner_ktp: allData.owner_ktp,
-                owner_address_province: allData.owner_address_province,
-                owner_address_city: allData.owner_address_city,
-                owner_address_subdistrict: allData.owner_address_subdistrict,
-                owner_address_village: allData.owner_address_village,
-                owner_address_detail: allData.owner_address_detail,
-                business_type: allData.business_type,
-                business_entity: allData.business_entity,
-                business_name: allData.business_name,
-                business_address_province: allData.business_address_province,
-                business_address_city: allData.business_address_city,
-                business_address_subdistrict: allData.business_address_subdistrict,
-                business_address_village: allData.business_address_village,
-                business_address_detail: allData.business_address_detail,
-                business_duration: allData.business_duration,
-                social_media_platform: allData.social_media_platform,
-                social_media_account: allData.social_media_account,
-                latitude: parseFloat(allData.latitude),
-                longitude: parseFloat(allData.longitude),
+            const businessTypeMap = { 'Jual Beli Kendaraan': 'jual_beli_kendaraan', 'Jasa Bengkel': 'bengkel', 'Jasa Cuci Kendaraan': 'cuci_kendaraan', 'Jual Beli Sparepart': 'jual_beli_sparepart', 'Jasa Sewa Kendaraan': 'sewa_kendaraan', 'Insurance Consultant': 'insurance_consultant', 'Fasilitas Pembiayaan': 'pembiayaan', 'Biro Jasa dan Sekolah Mengemudi': 'biro_jasa' };
+            const businessTypeForDB = businessTypeMap[allData.business_type];
+
+            profileDataForUpdate = {
+                pic_name: allData.pic_name, pic_phone: allData.pic_phone, pic_email: allData.pic_email,
+                pic_status: allData.pic_status, owner_name: allData.owner_name,
+                owner_phone: allData.owner_phone, owner_email: allData.owner_email, owner_ktp: allData.owner_ktp,
+                owner_address_province: allData.owner_address_province, owner_address_city: allData.owner_address_city,
+                owner_address_subdistrict: allData.owner_address_subdistrict, owner_address_village: allData.owner_address_village,
+                owner_address_detail: allData.owner_address_detail, business_type: businessTypeForDB,
+                business_entity: allData.business_entity, business_name: allData.business_name,
+                business_address_province: allData.business_address_province, business_address_city: allData.business_address_city,
+                business_address_subdistrict: allData.business_address_subdistrict, business_address_village: allData.business_address_village,
+                business_address_detail: allData.business_address_detail, business_duration: allData.business_duration,
+                social_media_platform: allData.social_media_platform, social_media_account: allData.social_media_account,
+                latitude: parseFloat(allData.latitude), longitude: parseFloat(allData.longitude),
             };
+
+            if (newFile) {
+                const existingProfile = await prisma.mitraProfile.findUnique({ where: { user_id: userId }, select: { store_images: true } });
+                if (existingProfile?.store_images) {
+                    const oldFilePath = path.join(__dirname, '..', existingProfile.store_images.replace(/^\//, ''));
+                    try { await fs.unlink(oldFilePath); console.log(`File lama Mitra ${oldFilePath} berhasil dihapus.`); }
+                    catch (e) { console.error("Gagal hapus file lama Mitra:", e.message); }
+                }
+                profileDataForUpdate.store_images = `/uploads/stores/${newFile.filename}`;
+            }
         } else {
             return res.status(400).json({ message: 'Tipe user tidak valid untuk pendaftaran ulang.' });
         }
-        
-        if (req.file) {
-            const existingProfile = await profileModel.findUnique({
-                where: { user_id: userId },
-                select: { selfie_url: true } // Asumsi Mitra juga punya selfie_url jika perlu
-            });
 
-            if (existingProfile && existingProfile.selfie_url) {
-                const oldFilePath = path.join(__dirname, '..', 'public', existingProfile.selfie_url);
-                try { await fs.unlink(oldFilePath); } catch (e) { console.error("Gagal hapus file lama:", e); }
-            }
-            // Tambahkan URL baru ke data yang akan diupdate
-            profileDataForUpdate.selfie_url = `/uploads/selfies/${req.file.filename}`;
-        }
-        
-        // 3. Jalankan transaksi dengan data yang sudah dipisah
+        // Jalankan transaksi
         await prisma.$transaction(async (tx) => {
             await tx.user.update({
                 where: { id: userId },
@@ -423,7 +390,7 @@ exports.resubmitProfile = async (req, res) => {
                     ...userDataForUpdate,
                     status: 'pending',
                     resubmitted_at: new Date(),
-                    rejection_reason: null, // Set kembali ke null
+                    rejection_reason: null,
                 },
             });
             await profileModel.update({
@@ -434,10 +401,10 @@ exports.resubmitProfile = async (req, res) => {
 
         res.status(200).json({ message: 'Data berhasil dikirim ulang dan akan ditinjau kembali oleh admin.' });
     } catch (error) {
-        // Hapus file jika ada error database
-        if (req.file) {
+        if (newFile) {
             try {
-                await require('fs').promises.unlink(req.file.path);
+                await fs.unlink(newFile.path);
+                console.log(`File baru ${newFile.filename} dihapus karena resubmit gagal.`);
             } catch (unlinkError) {
                 console.error("Error deleting file after failed resubmit:", unlinkError);
             }
@@ -487,14 +454,14 @@ exports.loginUser = async (req, res) => {
                 resubmit_allowed: user.resubmit_allowed
             }
         };
-        
+
         // 5. Selalu kembalikan status 200 OK jika kredensial benar
         // Biarkan frontend yang memutuskan apa yang harus dilakukan berdasarkan 'status'
         return res.status(200).json(responsePayload);
 
     } catch (error) {
         console.error('Login error:', error);
-        return res.status(500).json({ 
+        return res.status(500).json({
             message: 'Terjadi kesalahan saat login.',
         });
     }
@@ -526,7 +493,7 @@ exports.verifyEmail = async (req, res) => {
         await prisma.$transaction(async (tx) => {
             await tx.user.update({
                 where: { id: verificationToken.user_id },
-                data: { email_is_verified: true}, 
+                data: { email_is_verified: true },
             });
             await tx.verificationToken.delete({
                 where: { id: verificationToken.id },
