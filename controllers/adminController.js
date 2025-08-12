@@ -94,31 +94,32 @@ exports.getVerifiedCo = async (req, res) => {
     try {
         const [verifiedCo, total] = await prisma.$transaction([
             prisma.user.findMany({
-                where: {
-                    role: 'co',
-                    status: 'approved'
-                },
+                where: { role: 'co', status: 'approved' },
                 select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    phone: true,
-                    created_at: true,
-                    coProfile: true // Sertakan profil lengkapnya
+                    id: true, name: true, email: true, phone: true, created_at: true,
+                    coProfile: true,
+                    referred: {
+                        select: {
+                            referrer: {
+                                select: { id: true, name: true, email: true }
+                            }
+                        }
+                    }
                 }
             }),
-            prisma.user.count({
-                where: {
-                    role: 'co',
-                    status: 'approved'
-                }
-            })
+            prisma.user.count({ where: { role: 'co', status: 'approved' } })
         ]);
+
+        const formattedData = verifiedCo.map(user => {
+            const { referred, ...restOfUser } = user;
+            const referrerInfo = (referred && referred.length > 0) ? referred[0].referrer : null;
+            return { ...restOfUser, referrer: referrerInfo };
+        });
 
         res.status(200).json({
             message: "Data CO terverifikasi berhasil diambil.",
             total,
-            data: verifiedCo
+            data: formattedData 
         });
     } catch (error) {
         console.error("Error fetching verified COs:", error);
@@ -134,38 +135,34 @@ exports.getRegisteredMitra = async (req, res) => {
     try {
         const [mitras, total] = await prisma.$transaction([
             prisma.user.findMany({
-                where: {
-                    role: 'mitra',
-                    mitraProfile: {
-                        isNot: null // Memastikan profil mitra ada
-                    },
-                    status: 'approved'
-                },
+                where: { role: 'mitra', status: 'approved', mitraProfile: { isNot: null } },
                 select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    phone: true,
-                    status: true,
-                    created_at: true,
+                    id: true, name: true, email: true, phone: true, status: true, created_at: true,
                     mitraProfile: true,
+                    // --- PERBAIKAN: Tambahkan query untuk mengambil data referrer ---
+                    referred: {
+                        select: {
+                            referrer: {
+                                select: { id: true, name: true, email: true }
+                            }
+                        }
+                    }
                 }
             }),
-            prisma.user.count({
-                where: {
-                    role: 'mitra',
-                    mitraProfile: {
-                        isNot: null
-                    },
-                    status: 'approved'
-                }
-            })
+            prisma.user.count({ where: { role: 'mitra', status: 'approved', mitraProfile: { isNot: null } } })
         ]);
         
+        // --- PERBAIKAN: Format data agar mudah digunakan di frontend ---
+        const formattedData = mitras.map(user => {
+            const { referred, ...restOfUser } = user;
+            const referrerInfo = (referred && referred.length > 0) ? referred[0].referrer : null;
+            return { ...restOfUser, referrer: referrerInfo };
+        });
+
         res.status(200).json({
             message: "Data Mitra terdaftar berhasil diambil.",
             total,
-            data: mitras
+            data: formattedData // Kirim data yang sudah diformat
         });
     } catch (error) {
         console.error("Error fetching registered Mitras:", error);
