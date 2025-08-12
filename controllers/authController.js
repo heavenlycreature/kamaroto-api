@@ -342,9 +342,14 @@ exports.resubmitProfile = async (req, res) => {
             if (newFile) {
                 const existingProfile = await prisma.coProfile.findUnique({ where: { user_id: userId }, select: { selfie_url: true } });
                 if (existingProfile?.selfie_url) {
-                    const oldFilePath = path.join(__dirname, '..', existingProfile.selfie_url.replace(/^\//, ''));
-                    try { await fs.unlink(oldFilePath); console.log(`File lama CO ${oldFilePath} berhasil dihapus.`); }
-                    catch (e) { console.error("Gagal hapus file lama CO:", e.message); }
+                    const relativePath = existingProfile.selfie_url.replace(/^[/\\]/, '');
+                    const oldFilePath = path.join(__dirname, '..', 'public', relativePath);
+                    try {
+                        await fs.unlink(oldFilePath);
+                        console.log(`File lama CO ${oldFilePath} berhasil dihapus.`);
+                    } catch (e) {
+                        console.error("Gagal hapus file lama CO:", e.message);
+                    }
                 }
                 profileDataForUpdate.selfie_url = `/uploads/selfies/${newFile.filename}`;
             }
@@ -372,9 +377,14 @@ exports.resubmitProfile = async (req, res) => {
             if (newFile) {
                 const existingProfile = await prisma.mitraProfile.findUnique({ where: { user_id: userId }, select: { store_images: true } });
                 if (existingProfile?.store_images) {
-                    const oldFilePath = path.join(__dirname, '..', existingProfile.store_images.replace(/^\//, ''));
-                    try { await fs.unlink(oldFilePath); console.log(`File lama Mitra ${oldFilePath} berhasil dihapus.`); }
-                    catch (e) { console.error("Gagal hapus file lama Mitra:", e.message); }
+                    const relativePath = existingProfile.store_images.replace(/^[/\\]/, '');
+                    const oldFilePath = path.join(__dirname, '..', 'public', relativePath);
+                    try {
+                        await fs.unlink(oldFilePath);
+                        console.log(`File lama Mitra ${oldFilePath} berhasil dihapus.`);
+                    } catch (e) {
+                        console.error("Gagal hapus file lama Mitra:", e.message);
+                    }
                 }
                 profileDataForUpdate.store_images = `/uploads/stores/${newFile.filename}`;
             }
