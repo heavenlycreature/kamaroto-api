@@ -6,25 +6,43 @@ const fs = require('fs');
 // Konfigurasi storage untuk penyimpanan lokal
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-     let uploadPath = 'public/uploads/others';
-    // Pastikan direktori ada, jika tidak, buat direktorinya
+    let uploadPath = 'public/uploads/others';
     // Cek URL request untuk menentukan folder tujuan
-    if (req.originalUrl.includes('/register/captain') || req.originalUrl.includes('/resubmit')) {
-      // Jika dari registrasi/resubmit Captain (CO), simpan di 'selfies'
+    if (
+      req.originalUrl.includes('/register/captain') ||
+      (req.originalUrl.includes('/resubmit') && req.user?.role === 'co')
+    ) {
+      // registrasi/resubmit Captain (CO)
       uploadPath = 'public/uploads/selfies';
-    } else if (req.originalUrl.includes('/register/mitra')) {
-      // Jika dari registrasi Mitra, simpan di 'stores'
+    } else if (
+      req.originalUrl.includes('/register/mitra') ||
+      (req.originalUrl.includes('/resubmit') && req.user?.role === 'mitra')
+    ) {
+      // registrasi/resubmit Mitra
       uploadPath = 'public/uploads/stores';
     }
-    
+
     fs.mkdirSync(uploadPath, { recursive: true });
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     // Buat nama file yang unik untuk menghindari konflik
-    // Format: selfie-timestamp.extension
     const uniqueSuffix = Date.now() + path.extname(file.originalname);
-    cb(null, `selfie-${uniqueSuffix}`);
+    let prefix = 'file-';
+
+    if (
+      req.originalUrl.includes('/register/captain') ||
+      (req.originalUrl.includes('/resubmit') && req.user?.role === 'co')
+    ) {
+      prefix = 'selfie-';
+    } else if (
+      req.originalUrl.includes('/register/mitra') ||
+      (req.originalUrl.includes('/resubmit') && req.user?.role === 'mitra')
+    ) {
+      prefix = 'store-';
+    }
+
+    cb(null, `${prefix}${uniqueSuffix}`);
   }
 });
 
