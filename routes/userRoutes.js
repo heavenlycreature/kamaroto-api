@@ -12,10 +12,6 @@ const upload = require('../middleware/upload');
 // Get all pending users (Admin only)
 router.get('/pending', authenticateToken, authorizeRoles('admin'), userController.getAllPendingUsers);
 
-router.get('/address', addressController.getAddresses);
-
-// Route untuk mengambil koordinat
-router.get('/address/coordinates', addressController.getCoordinates);
 
 // Update CO profile (CO only)
 router.put('/captain/profile/edit', authenticateToken, authorizeRoles('co'), coController.updateCaptainProfile);

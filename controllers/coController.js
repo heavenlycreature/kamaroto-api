@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { geocodeAddressFlexible } = require('../utils/geocode/flexibleGeocode');
 
 /**
  * Mengambil detail profil dari Captain yang sedang login.
@@ -43,82 +44,99 @@ exports.updateCaptainProfile = async (req, res) => {
     const userId = req.user.id;
     
     const {
-        name, phone, birth_date, gender,
-        address_province, address_city, address_subdistrict, address_village, address_detail,
-        job, marital_status, education
-    } = req.body;
+    name, phone, birth_date, gender, job, marital_status, education,
+    address_detail,
+    address_province_code, address_province_name,
+    address_regency_code, address_regency_name,
+    address_district_code, address_district_name,
+    address_village_code, address_village_name,
+    address_postal_code,
+  } = req.body;
 
-    try {
-        // Siapkan objek untuk menampung data yang akan diupdate di coProfile
-        const coProfileUpdateData = {};
-
-        // Tambahkan data non-alamat ke objek update jika ada
-        if (name) coProfileUpdateData.name = name;
-        if (birth_date) coProfileUpdateData.birth_date = new Date(birth_date);
-        if (gender) coProfileUpdateData.gender = gender;
-        if (job) coProfileUpdateData.job = job;
-        if (marital_status) coProfileUpdateData.marital_status = marital_status;
-        if (education) coProfileUpdateData.education = education;
-        if (address_detail) coProfileUpdateData.address_detail = address_detail;
-
-        // --- LOGIKA BARU UNTUK UPDATE KOORDINAT ---
-        // Cek apakah semua field alamat yang diperlukan ada untuk mencari koordinat baru
-        if (address_province && address_city && address_subdistrict && address_village) {
-            // Tambahkan field alamat ke data yang akan diupdate
-            coProfileUpdateData.address_province = address_province;
-            coProfileUpdateData.address_city = address_city;
-            coProfileUpdateData.address_subdistrict = address_subdistrict;
-            coProfileUpdateData.address_village = address_village;
-
-            // Cari data alamat di database untuk mendapatkan koordinat baru
-            const newAddressData = await prisma.address.findFirst({
-                where: {
-                    province: address_province,
-                    city: address_city,
-                    district: address_subdistrict, // Sesuaikan dengan skema Anda
-                    subdistrict: address_village,   // Sesuaikan dengan skema Anda
-                }
-            });
-
-            // Jika alamat ditemukan, perbarui latitude dan longitude
-            if (newAddressData) {
-                coProfileUpdateData.latitude = newAddressData.latitude;
-                coProfileUpdateData.longitude = newAddressData.longitude;
-            } else {
-                // Opsional: jika alamat baru tidak ada di DB, Anda bisa set koordinat ke null
-                coProfileUpdateData.latitude = null;
-                coProfileUpdateData.longitude = null;
-            }
+     try {
+    // ambil profil lama untuk deteksi perubahan alamat
+    const current = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        phone: true,
+        coProfile: {
+          select: {
+            address_province_name: true, address_regency_name: true,
+            address_district_name: true, address_village_name: true,
+            address_postal_code: true, address_detail: true,
+            latitude: true, longitude: true
+          }
         }
+      }
+    });
 
-        // Siapkan data untuk diupdate di tabel user
-        const userUpdateData = {};
-        if (name) userUpdateData.name = name;
-        if (phone) userUpdateData.phone = phone;
+    const coProfileUpdateData = {};
+    const userUpdateData = {};
 
-        // Lakukan update secara transaksional
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
-            data: {
-                ...userUpdateData,
-                coProfile: {
-                    update: coProfileUpdateData
-                }
-            },
-            select: {
-                id: true,
-                email: true,
-                phone: true,
-                coProfile: true
-            }
-        });
+    if (name) userUpdateData.name = name;
+    if (phone) userUpdateData.phone = phone;
 
-        res.status(200).json({ message: 'Profil berhasil diperbarui.', user: updatedUser });
+    if (birth_date) coProfileUpdateData.birth_date = new Date(birth_date);
+    if (gender) coProfileUpdateData.gender = gender;
+    if (job) coProfileUpdateData.job = job;
+    if (marital_status) coProfileUpdateData.marital_status = marital_status;
+    if (education) coProfileUpdateData.education = education;
+    if (address_detail !== undefined) coProfileUpdateData.address_detail = address_detail;
 
-    } catch (error) {
-        console.error('Error updating captain profile:', error);
-        res.status(500).json({ message: 'Terjadi kesalahan pada server saat memperbarui profil.' });
+    // alamat (schema baru) — simpan apa adanya jika dikirim
+    const addressFields = {
+      address_province_code, address_province_name,
+      address_regency_code,  address_regency_name,
+      address_district_code, address_district_name,
+      address_village_code,  address_village_name,
+      address_postal_code
+    };
+    Object.entries(addressFields).forEach(([k, v]) => {
+      if (v !== undefined) coProfileUpdateData[k] = v;
+    });
+
+    // ==== DETEKSI: apakah alamat berubah? ====
+    const before = current?.coProfile || {};
+    const changed =
+      (address_province_name && address_province_name !== before.address_province_name) ||
+      (address_regency_name  && address_regency_name  !== before.address_regency_name)  ||
+      (address_district_name && address_district_name !== before.address_district_name) ||
+      (address_village_name  && address_village_name  !== before.address_village_name)  ||
+      (address_postal_code   && address_postal_code   !== before.address_postal_code)   ||
+      (address_detail !== undefined && address_detail !== before.address_detail);
+
+    // ==== GEOCODE bila ada perubahan alamat ====
+    if (changed) {
+      // rakit query terstruktur untuk Nominatim
+      const structured = {
+        street:  address_detail || before.address_detail || '',
+        city:    address_regency_name  || before.address_regency_name  || '',
+        county:  '', // opsional, kita tidak punya
+        state:   address_province_name || before.address_province_name || '',
+        postalcode: address_postal_code || before.address_postal_code || '',
+      };
+      // beberapa wilayah pakai "district" sebagai kota — fallback bila city kosong
+      if (!structured.city) structured.city = address_district_name || before.address_district_name || '';
+
+      const coords = await geocodeAddressFlexible({ structured });
+      coProfileUpdateData.latitude  = coords?.latitude  ?? null;
+      coProfileUpdateData.longitude = coords?.longitude ?? null;
     }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...userUpdateData,
+        coProfile: { update: coProfileUpdateData }
+      },
+      select: { id: true, email: true, phone: true, coProfile: true }
+    });
+
+    res.status(200).json({ message: 'Profil berhasil diperbarui.', user: updated });
+  } catch (error) {
+    console.error('Error updating captain profile:', error);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server saat memperbarui profil.' });
+  }
 };
 
 /**

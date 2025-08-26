@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 const { sendVerificationEmail, sendPasswordResetEmail, sendNewRegistrationNotification } = require('../utils/mailer');
+const { geocodeAddressFlexible } = require('../utils/geocode/flexibleGeocode')
 
 const prisma = new PrismaClient();
 
@@ -32,6 +33,7 @@ async function getSettingValue(key) {
     return parseInt(setting.value, 10);
 }
 
+
 /**
  * Mendaftarkan user Mitra baru beserta profilnya dalam satu transaksi.
  */
@@ -42,10 +44,18 @@ exports.registerMitra = async (req, res) => {
         // Data untuk tabel 'mitra_profiles'
         referral_code, pic_name, pic_phone, pic_email, pic_status,
         owner_name, owner_phone, owner_email, owner_ktp,
-        owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
+        owner_address_province_code, owner_address_province_name,
+        owner_address_regency_code, owner_address_regency_name,
+        owner_address_district_code, owner_address_district_name,
+        owner_address_village_code, owner_address_village_name,
+        owner_address_postal_code, owner_address_detail,
         business_type, business_entity, business_name,
-        business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
-        business_duration, social_media_platform, social_media_account, latitude, longitude
+        business_address_province_code, business_address_province_name,
+        business_address_regency_code, business_address_regency_name,
+        business_address_district_code, business_address_district_name,
+        business_address_village_code, business_address_village_name,
+        business_address_postal_code, business_address_detail,
+        business_duration, social_media_platform, social_media_account, 
     } = req.body;
 
     if (!req.file) {
@@ -55,6 +65,15 @@ exports.registerMitra = async (req, res) => {
     const store_images = `/uploads/stores/${req.file.filename}`;
 
     try {
+
+        const coordinates = await geocodeAddressFlexible({
+        address_detail:         business_address_detail,
+        address_village_name:   business_address_village_name,
+        address_district_name:  business_address_district_name,
+        address_regency_name:   business_address_regency_name,
+        address_province_name:  business_address_province_name,
+        address_postal_code:    business_address_postal_code,
+        })
         // Hash password sebelum disimpan
         const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -76,12 +95,20 @@ exports.registerMitra = async (req, res) => {
                         create: {
                             pic_name, pic_phone, pic_email, pic_status,
                             owner_name, owner_phone, owner_email, owner_ktp,
-                            owner_address_province, owner_address_city, owner_address_subdistrict, owner_address_village, owner_address_detail,
+                            owner_address_province_code, owner_address_province_name,
+                            owner_address_regency_code, owner_address_regency_name,
+                            owner_address_district_code, owner_address_district_name,
+                            owner_address_village_code, owner_address_village_name,
+                            owner_address_postal_code, owner_address_detail,
                             business_type, business_entity, business_name,
-                            business_address_province, business_address_city, business_address_subdistrict, business_address_village, business_address_detail,
+                            business_address_province_code, business_address_province_name,
+                            business_address_regency_code, business_address_regency_name,
+                            business_address_district_code, business_address_district_name,
+                            business_address_village_code, business_address_village_name,
+                            business_address_postal_code, business_address_detail,
                             business_duration, social_media_platform, social_media_account,
-                            latitude: parseFloat(latitude),
-                            longitude: parseFloat(longitude),
+                            latitude: coordinates?.latitude ?? null,
+                            longitude: coordinates?.longitude ?? null,
                             store_images: store_images // Simpan sebagai array
                         },
                     },
@@ -150,8 +177,13 @@ exports.registerCo = async (req, res) => {
     const {
         name, email, password, phone, nik,
         birth_place, birth_date, gender,
-        address_province, address_city, referral_code, address_subdistrict, address_village, address_detail,
-        job, marital_status, education, latitude, longitude
+        referral_code,
+        address_province_code, address_province_name,
+        address_regency_code, address_regency_name,
+        address_district_code, address_district_name,
+        address_village_code, address_village_name,
+        address_postal_code, address_detail,
+        job, marital_status, education,
     } = req.body;
 
     // Cek apakah file diunggah
@@ -171,6 +203,16 @@ exports.registerCo = async (req, res) => {
     const selfie_url = `/uploads/selfies/${req.file.filename}`;
 
     try {
+
+         const coordinates = await geocodeAddressFlexible({
+            address_detail,
+            address_village_name,
+            address_district_name,
+            address_regency_name,
+            address_province_name,
+            address_postal_code,
+        });
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const referrerId = await validateReferral(referral_code);
 
@@ -184,10 +226,14 @@ exports.registerCo = async (req, res) => {
                         create: {
                             name, email, nik, birth_place,
                             birth_date: birthDateObject,
-                            gender, address_province, address_city, address_subdistrict, address_village, address_detail,
+                            gender,  address_province_code, address_province_name,
+                            address_regency_code, address_regency_name,
+                            address_district_code, address_district_name,
+                            address_village_code, address_village_name,
+                            address_postal_code, address_detail,
                             job, marital_status, education, selfie_url,
-                            latitude: parseFloat(latitude),
-                            longitude: parseFloat(longitude),
+                            latitude: coordinates?.latitude ?? null,
+                            longitude: coordinates?.longitude ?? null,
                         },
                     },
                 },
@@ -304,6 +350,41 @@ exports.getCurrentUserProfile = async (req, res) => {
  * Logic untuk menhandle resubmit profile
  */
 
+function buildGeocodePayloadFromAllData(role, allData) {
+  if (role === 'co') {
+    return {
+      address_detail:        allData.address_detail,
+      address_village_name:  allData.address_village_name,
+      address_district_name: allData.address_district_name,
+      address_regency_name:  allData.address_regency_name,
+      address_province_name: allData.address_province_name,
+      address_postal_code:   allData.address_postal_code,
+    };
+  }
+  // mitra (alamat usaha)
+  return {
+    address_detail:        allData.business_address_detail,
+    address_village_name:  allData.business_address_village_name,
+    address_district_name: allData.business_address_district_name,
+    address_regency_name:  allData.business_address_regency_name,
+    address_province_name: allData.business_address_province_name,
+    address_postal_code:   allData.business_address_postal_code,
+  };
+}
+
+function hasAddressChanged(oldObj, newObj) {
+  // bandingkan field utama alamat
+  const keys = [
+    'address_detail',
+    'address_village_name',
+    'address_district_name',
+    'address_regency_name',
+    'address_province_name',
+    'address_postal_code',
+  ];
+  return keys.some(k => String(oldObj?.[k] ?? '') !== String(newObj?.[k] ?? ''));
+}
+
 exports.resubmitProfile = async (req, res) => {
     const { id: userId, role } = req.user;
     const allData = req.body;
@@ -316,6 +397,11 @@ exports.resubmitProfile = async (req, res) => {
         if (!user || user.status !== 'rejected' || !user.resubmit_allowed) {
             return res.status(403).json({ message: 'Anda tidak diizinkan untuk melakukan pendaftaran ulang.' });
         }
+
+         const existingProfile =
+            role === 'co'
+                ? await prisma.coProfile.findUnique({ where: { user_id: userId } })
+                : await prisma.mitraProfile.findUnique({ where: { user_id: userId } });
 
         // 1. Siapkan data untuk tabel User, ambil dari field yang sesuai dengan rolenya
         const userDataForUpdate = {
@@ -333,10 +419,19 @@ exports.resubmitProfile = async (req, res) => {
                 name: allData.name, email: allData.email, nik: allData.nik,
                 birth_place: allData.birth_place, birth_date: new Date(allData.birth_date),
                 gender: allData.gender, address_province: allData.address_province,
-                address_city: allData.address_city, address_subdistrict: allData.address_subdistrict,
-                address_village: allData.address_village, address_detail: allData.address_detail,
+                address_province_code: allData.address_province_code, 
+                address_province_name: allData.address_province_name,
+                address_regency_code: allData.address_regency_code, 
+                address_regency_name: allData.address_regency_name,
+                address_district_code: allData.address_district_code, 
+                address_district_name: allData.address_district_name,
+                address_village_code: allData.address_village_code, 
+                address_village_name: allData.address_village_name,
+                address_postal_code: allData.address_postal_code, 
+                address_detail: allData.address_detail,
                 job: allData.job, marital_status: allData.marital_status, education: allData.education,
-                latitude: parseFloat(allData.latitude), longitude: parseFloat(allData.longitude),
+                latitude: isFinite(parseFloat(allData.latitude))  ? parseFloat(allData.latitude)  : existingProfile?.latitude ?? null,
+                longitude: isFinite(parseFloat(allData.longitude)) ? parseFloat(allData.longitude) : existingProfile?.longitude ?? null,
             };
 
             if (newFile) {
@@ -363,15 +458,30 @@ exports.resubmitProfile = async (req, res) => {
                 pic_name: allData.pic_name, pic_phone: allData.pic_phone, pic_email: allData.pic_email,
                 pic_status: allData.pic_status, owner_name: allData.owner_name,
                 owner_phone: allData.owner_phone, owner_email: allData.owner_email, owner_ktp: allData.owner_ktp,
-                owner_address_province: allData.owner_address_province, owner_address_city: allData.owner_address_city,
-                owner_address_subdistrict: allData.owner_address_subdistrict, owner_address_village: allData.owner_address_village,
+                owner_address_province_code: allData.owner_address_province_code,
+                owner_address_province_name: allData.owner_address_province_name,
+                owner_address_regency_code: allData.owner_address_regency_code,
+                owner_address_regency_name: allData.owner_address_regency_name,
+                owner_address_district_code: allData.owner_address_district_code,
+                owner_address_district_name: allData.owner_address_district_name,
+                owner_address_village_code: allData.owner_address_village_code,
+                owner_address_village_name: allData.owner_address_village_name,
+                owner_address_postal_code: allData.owner_address_postal_code,
                 owner_address_detail: allData.owner_address_detail, business_type: businessTypeForDB,
                 business_entity: allData.business_entity, business_name: allData.business_name,
-                business_address_province: allData.business_address_province, business_address_city: allData.business_address_city,
-                business_address_subdistrict: allData.business_address_subdistrict, business_address_village: allData.business_address_village,
+                business_address_province_code: allData.business_address_province_code,
+                business_address_province_name: allData.business_address_province_name,
+                business_address_regency_code: allData.business_address_regency_code,
+                business_address_regency_name: allData.business_address_regency_name,
+                business_address_district_code: allData.business_address_district_code,
+                business_address_district_name: allData.business_address_district_name,
+                business_address_village_code: allData.business_address_village_code,
+                business_address_village_name: allData.business_address_village_name,
+                business_address_postal_code: allData.business_address_postal_code,
                 business_address_detail: allData.business_address_detail, business_duration: allData.business_duration,
                 social_media_platform: allData.social_media_platform, social_media_account: allData.social_media_account,
-                latitude: parseFloat(allData.latitude), longitude: parseFloat(allData.longitude),
+                latitude: isFinite(parseFloat(allData.latitude))  ? parseFloat(allData.latitude)  : existingProfile?.latitude ?? null,
+                longitude: isFinite(parseFloat(allData.longitude)) ? parseFloat(allData.longitude) : existingProfile?.longitude ?? null,
             };
 
             if (newFile) {
@@ -390,6 +500,42 @@ exports.resubmitProfile = async (req, res) => {
             }
         } else {
             return res.status(400).json({ message: 'Tipe user tidak valid untuk pendaftaran ulang.' });
+        }
+         const newAddr = buildGeocodePayloadFromAllData(role, allData);
+         const oldAddr =
+          role === 'co'
+            ? {
+                address_detail:        existingProfile?.address_detail,
+                address_village_name:  existingProfile?.address_village_name,
+                address_district_name: existingProfile?.address_district_name,
+                address_regency_name:  existingProfile?.address_regency_name,
+                address_province_name: existingProfile?.address_province_name,
+                address_postal_code:   existingProfile?.address_postal_code,
+              }
+            : {
+                address_detail:        existingProfile?.business_address_detail,
+                address_village_name:  existingProfile?.business_address_village_name,
+                address_district_name: existingProfile?.business_address_district_name,
+                address_regency_name:  existingProfile?.business_address_regency_name,
+                address_province_name: existingProfile?.business_address_province_name,
+                address_postal_code:   existingProfile?.business_address_postal_code,
+              };
+          
+        const needGeocode =
+          hasAddressChanged(oldAddr, newAddr) ||
+          !isFinite(parseFloat(profileDataForUpdate.latitude)) ||
+          !isFinite(parseFloat(profileDataForUpdate.longitude));
+          
+        if (needGeocode) {
+          try {
+            const coords = await geocodeAddressFlexible(newAddr); // structured -> freeform fallback
+            if (coords) {
+              profileDataForUpdate.latitude  = coords.latitude;
+              profileDataForUpdate.longitude = coords.longitude;
+            }
+          } catch (e) {
+            console.warn('Resubmit geocode skipped (fallback to previous lat/lon):', e.message);
+          }
         }
 
         // Jalankan transaksi
