@@ -9,7 +9,7 @@ const productUpload = require('../middleware/images/productUpload.js');
 // Terapkan middleware untuk semua rute di file ini:
 // 1. verifyToken: Memastikan user login dan menyematkan data user di `req.user`.
 // 2. isMitra: Memastikan user yang login memiliki peran 'MITRA'.
-router.use(auth.verifyToken, auth.isMitra);
+router.use(auth.authenticateToken);
 
 
 router.put('/store-info', mitraController.updateStoreInfo);
