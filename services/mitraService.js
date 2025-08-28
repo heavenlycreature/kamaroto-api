@@ -3,23 +3,47 @@ const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 
-exports.updateStoreInfo = (mitraProfileId, data) => {
-    // Ambil hanya field yang boleh diubah oleh mitra
-    const { business_name, business_logo_url, business_banner_url, openHours } = data;
+exports.updateStoreInfo = async (mitraProfileId, data) => {
+    const currentProfile = await prisma.mitraProfile.findUnique({
+        where: { id: mitraProfileId },
+        select: { business_logo_url: true, business_banner_url: true }
+    });
 
-    const dataToUpdate = {
-        business_name,
-        business_logo_url,
-        business_banner_url,
-        openHours,
+    if (!currentProfile) {
+        throw new Error('Profil Mitra tidak ditemukan.');
+    }
+
+    const dataToUpdate = { ...data };
+
+    const deleteOldFile = (filePath) => {
+        if (!filePath) return;
+        try {
+            const fullPath = path.join(process.cwd(), 'public', filePath);
+            if (fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+                console.log(`File lama dihapus: ${fullPath}`);
+            }
+        } catch (err) {
+            console.error(`Gagal menghapus file lama ${filePath}:`, err);
+        }
     };
 
+    if (files.logo && files.logo[0]) {
+        deleteOldFile(currentProfile.business_logo_url);
+        dataToUpdate.business_logo_url = `/uploads/store-assets/${files.logo[0].filename}`;
+    }
+
+    if (files.banner && files.banner[0]) {
+        deleteOldFile(currentProfile.business_banner_url);
+        dataToUpdate.business_banner_url = `/uploads/store-assets/${files.banner[0].filename}`;
+    }
+    
     Object.keys(dataToUpdate).forEach(key => {
         if (dataToUpdate[key] === undefined) {
             delete dataToUpdate[key];
         }
     });
-
+    
     return prisma.mitraProfile.update({
         where: { id: mitraProfileId },
         data: dataToUpdate

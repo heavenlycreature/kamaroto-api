@@ -6,13 +6,12 @@ const mitraController = require('../controllers/mitraController');
 const auth = require('../middleware/auth/authMiddleware'); // Asumsi path middleware autentikasi
 const ownership = require('../middleware/ownership'); // Asumsi path middleware kepemilikan
 const productUpload = require('../middleware/images/productUpload.js');
-// Terapkan middleware untuk semua rute di file ini:
-// 1. verifyToken: Memastikan user login dan menyematkan data user di `req.user`.
-// 2. isMitra: Memastikan user yang login memiliki peran 'MITRA'.
-router.use(auth.authenticateToken);
+const storeAsset = require('../middleware/images/storeAsset.js');
+
+router.use(auth.authenticateToken, auth.isMitra);
 
 
-router.put('/store-info', mitraController.updateStoreInfo);
+router.put('/store/info', storeAsset , mitraController.updateStoreInfo);
 
 /**
  * @route   POST /api/products

@@ -134,8 +134,13 @@ exports.updateMitraProfile = async (req, res) => {
 exports.updateStoreInfo = async (req, res) => {
     try {
         const mitraProfileId = req.user.mitraProfile.id;
-        const updateData = req.body; 
-        const updatedProfile = await mitraService.updateStoreInfo(mitraProfileId, updateData);
+        const updateData = req.body;
+         const files = req.files;
+
+        if (updateData.openHours) {
+            updateData.openHours = JSON.parse(updateData.openHours);
+        }
+        const updatedProfile = await mitraService.updateStoreInfo(mitraProfileId, updateData, files);
         res.status(200).json({ message: 'Informasi toko berhasil diperbarui.', data: updatedProfile });
     } catch (error) {
         res.status(400).json({ message: error.message });

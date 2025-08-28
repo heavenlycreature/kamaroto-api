@@ -47,3 +47,16 @@ exports.authorizeRoles = (...roles) => {
     next();
   };
 };
+
+exports.isMitra = (req, res, next) => {
+    // Middleware ini mengasumsikan `req.user` sudah diisi oleh `verifyToken`
+    if (req.user && req.user.role === 'MITRA') {
+        // Jika peran user adalah MITRA, lanjutkan ke handler berikutnya
+        next();
+    } else {
+        // Jika tidak, kirim respons 403 Forbidden (Akses Ditolak)
+        return res.status(403).json({
+            message: 'Akses ditolak. Rute ini hanya untuk pengguna dengan peran Mitra.'
+        });
+    }
+};
