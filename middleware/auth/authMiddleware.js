@@ -1,16 +1,42 @@
 const jwt = require('jsonwebtoken');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-exports.authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+exports.authenticateToken = async (req, res, next) => {
+     let token;
 
-  if (token == null) return res.sendStatus(401); // No token provided
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403); // Invalid token
-    req.user = user; // Attach user payload to the request
-    next();
-  });
+            // [PENYESUAIAN PENTING] Gunakan `include` untuk mengambil profil terkait
+            req.user = await prisma.user.findUnique({
+                where: { id: decoded.id },
+                include: {
+                    // Sertakan objek mitraProfile, tapi kita hanya butuh ID-nya
+                    mitraProfile: {
+                        select: {
+                            id: true 
+                        }
+                    }
+                    // Anda bisa menambahkan coProfile di sini jika diperlukan untuk rute lain
+                }
+            });
+            
+            if (!req.user) {
+                return res.status(401).json({ message: 'Token tidak valid, pengguna tidak ditemukan.' });
+            }
+
+            next();
+        } catch (error) {
+            return res.status(401).json({ message: 'Tidak terautentikasi, token gagal.' });
+        }
+    }
+
+    if (!token) {
+        return res.status(401).json({ message: 'Tidak terautentikasi, tidak ada token.' });
+    }
 };
 
 exports.authorizeRoles = (...roles) => {

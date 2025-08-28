@@ -33,7 +33,7 @@ exports.updateStoreInfo = (mitraProfileId, data) => {
  * @param {object} data - Data produk dari request body.
  * @returns {Promise<object>} - Objek produk yang baru dibuat.
  */
-exports.createProduct = async (mitraProfileId, data) => {
+exports.createProduct = async (mitraProfileId, data, files = []) => {
     const { type, vehicleDetail, ...productData } = data;
 
     // Validasi input
