@@ -166,36 +166,6 @@ model Point {
   @@map("points")
 }
 
-// ===============================================
-// SKEMA UNTUK FITUR MITRA & PRODUK
-// ===============================================
-
-
-
-// Model Toko (milik Mitra)
-model Store {
-  id          String @id @default(cuid())
-  name        String
-  address     String
-  latitude    Float?
-  longitude   Float?
-  openHours   Json?     // Contoh: { "monday": "09:00-17:00", "tuesday": "09:00-17:00" }
-  phone       String?
-  status      StoreStatus @default(ACTIVE)
-
-  // Relasi 1-ke-1 dengan User (Mitra)
-  user        User   @relation(fields: [userId], references: [id])
-  userId      String @unique
-
-  // Relasi 1-ke-Banyak
-  products    Product[]
-  mechanics   Mechanic[]
-  workshopSlots WorkshopSlot[]
-  washSlots   WashSlot[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
 
 // Model Produk atau Layanan yang dijual Mitra
 model Product {
@@ -222,7 +192,7 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([storeId])
+  @@index([mitraProfileId])
 }
 
 // Model Media untuk Produk (foto, video, dll.)
