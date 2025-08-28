@@ -10,6 +10,7 @@ const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const mitraRoutes = require('./routes/mitraRoutes');
 dotenv.config();
 
 const app = express();
@@ -21,10 +22,12 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
+// ... rute lainnya
 
 app.use('/', authRoutes);
 app.use('/', userRoutes);
 app.use('/admin', adminRoutes);
+app.use('/mitra', mitraRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {

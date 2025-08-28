@@ -7,7 +7,7 @@ const mitraController = require('../controllers/mitraController');
 const authController = require('../controllers/authController');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth/authMiddleware');
 const {allowResubmit} = require('../middleware/auth/allowResubmit');
-const upload = require('../middleware/upload');
+const upload = require('../middleware/images/upload');
 
 // Get all pending users (Admin only)
 router.get('/pending', authenticateToken, authorizeRoles('admin'), userController.getAllPendingUsers);
