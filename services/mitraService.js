@@ -1,13 +1,13 @@
-const {Prisma, PrismaClient } = require('@prisma/client'); // Sesuaikan path ke prisma client Anda
+const { Prisma, PrismaClient } = require('@prisma/client'); // Sesuaikan path ke prisma client Anda
 const prisma = new PrismaClient();
-const fs = require('fs'); 
-const path = require('path'); 
+const fs = require('fs');
+const path = require('path');
 
 exports.updateStoreInfo = (mitraProfileId, data) => {
     // Ambil hanya field yang boleh diubah oleh mitra
     const { business_name, business_logo_url, business_banner_url, openHours } = data;
 
-     const dataToUpdate = {
+    const dataToUpdate = {
         business_name,
         business_logo_url,
         business_banner_url,
@@ -19,7 +19,7 @@ exports.updateStoreInfo = (mitraProfileId, data) => {
             delete dataToUpdate[key];
         }
     });
-    
+
     return prisma.mitraProfile.update({
         where: { id: mitraProfileId },
         data: dataToUpdate
@@ -40,11 +40,14 @@ exports.createProduct = async (mitraProfileId, data) => {
     if (!type || !['VEHICLE', 'SPAREPART'].includes(type)) {
         throw new Error('Tipe produk tidak valid. Harus VEHICLE atau SPAREPART.');
     }
-    
-    if (type === 'VEHICLE' && (!vehicleDetail || !vehicleDetail.plateNumber)) {
-        throw new Error('Data `vehicleDetail` dengan `plateNumber` wajib diisi untuk tipe VEHICLE.');
-    }
 
+    if (productData.price) {
+        productData.price = parseFloat(productData.price);
+    }
+    if (productData.stock) {
+        productData.stock = parseInt(productData.stock, 10);
+    }
+    
     // Gunakan transaksi Prisma untuk memastikan integritas data
     const newProduct = await prisma.$transaction(async (tx) => {
         const product = await tx.product.create({
@@ -65,29 +68,29 @@ exports.createProduct = async (mitraProfileId, data) => {
             });
         }
 
-       if (files.length > 0) {
+        if (files.length > 0) {
             const mediaData = files.map((file, index) => ({
                 // Simpan path relatif yang bisa diakses publik
-                url: `/uploads/products/${file.filename}`, 
+                url: `/uploads/products/${file.filename}`,
                 type: 'IMAGE',
                 order: index, // Urutan berdasarkan urutan upload
                 productId: product.id
             }));
             await tx.productMedia.createMany({ data: mediaData });
         }
-        
+
         return product;
     });
-    
+
     // Ambil kembali data lengkap untuk dikirim sebagai response
     return prisma.product.findUnique({
         where: { id: newProduct.id },
-        include: { 
+        include: {
             vehicleDetail: true,
             media: {
                 orderBy: { order: 'asc' } // Urutkan gambar berdasarkan 'order'
             }
-         }
+        }
     });
 };
 
@@ -133,8 +136,8 @@ exports.updateProduct = async (id, data, files = []) => {
     });
 
     const urlsToDelete = oldMedia
-        .filter(media => !keptUrls.includes(media.url)) 
-        .map(media => media.url); 
+        .filter(media => !keptUrls.includes(media.url))
+        .map(media => media.url);
 
     // Langkah 3: Hapus setiap file fisik dari storage
     if (urlsToDelete.length > 0) {
@@ -143,7 +146,7 @@ exports.updateProduct = async (id, data, files = []) => {
             try {
                 // Buat path absolut ke file. Contoh url: '/uploads/products/file.jpg'
                 const filePath = path.join(process.cwd(), 'public', url);
-                
+
                 // Cek apakah file ada sebelum dihapus
                 if (fs.existsSync(filePath)) {
                     fs.unlinkSync(filePath); // Hapus file secara sinkron
@@ -171,7 +174,7 @@ exports.updateProduct = async (id, data, files = []) => {
             where: { productId: id }
         });
 
-         if (finalOrder.length > 0) {
+        if (finalOrder.length > 0) {
             const mediaToCreate = [];
             let newFileIndex = 0;
 
@@ -203,7 +206,7 @@ exports.updateProduct = async (id, data, files = []) => {
                 await tx.productMedia.createMany({ data: mediaToCreate });
             }
         }
-        
+
         return tx.product.findUniqueOrThrow({
             where: { id },
             include: {
@@ -221,7 +224,7 @@ exports.updateProduct = async (id, data, files = []) => {
  * @returns {Promise<void>}
  */
 exports.deleteProduct = async (id) => {
-     const mediaToDelete = await prisma.productMedia.findMany({
+    const mediaToDelete = await prisma.productMedia.findMany({
         where: { productId: id },
         select: { url: true }
     });
