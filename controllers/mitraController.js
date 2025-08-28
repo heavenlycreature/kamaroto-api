@@ -148,7 +148,7 @@ exports.updateStoreInfo = async (req, res) => {
 exports.createProduct = async (req, res) => {
     try {
         // ID toko diambil dari data user yang sudah diverifikasi oleh middleware auth
-        const mitraProfileId = req.user.mitraProfile.id;
+        const mitraProfileId = req.user.id;
         const productData = req.body;
         const files = req.files; 
         
@@ -171,7 +171,7 @@ exports.createProduct = async (req, res) => {
  */
 exports.getMyProducts = async (req, res) => {
     try {
-        const mitraProfileId = req.user.mitraProfile.id;
+        const mitraProfileId = req.user.id;
         const products = await productService.getProductsByStore(mitraProfileId);
         res.status(200).json({ data: products });
     } catch (error) {
