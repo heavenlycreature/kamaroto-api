@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 
-exports.updateStoreInfo = async (mitraProfileId, data) => {
+exports.updateStoreInfo = async (mitraProfileId, data, files = {}) => {
     const currentProfile = await prisma.mitraProfile.findUnique({
         where: { id: mitraProfileId },
         select: { business_logo_url: true, business_banner_url: true }
