@@ -6,12 +6,12 @@ const mitraController = require('../controllers/mitraController');
 const auth = require('../middleware/auth/authMiddleware'); // Asumsi path middleware autentikasi
 const ownership = require('../middleware/ownership'); // Asumsi path middleware kepemilikan
 const productUpload = require('../middleware/images/productUpload.js');
-const storeAsset = require('../middleware/images/storeAsset.js');
+const storeAssetUpload = require('../middleware/images/storeAssetUpload.js');
 
 router.use(auth.authenticateToken, auth.isMitra);
 
 
-router.put('/store/info', storeAsset , mitraController.updateStoreInfo);
+router.put('/store/info', storeAssetUpload , mitraController.updateStoreInfo);
 
 /**
  * @route   POST /api/products
