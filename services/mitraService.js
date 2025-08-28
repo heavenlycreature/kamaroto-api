@@ -103,7 +103,14 @@ exports.getProductsByStore = (mitraProfileId) => {
     return prisma.product.findMany({
         where: { mitraProfileId },
         orderBy: { createdAt: 'desc' },
-        include: { vehicleDetail: true } // Selalu sertakan detail kendaraan jika ada
+        include: { 
+            vehicleDetail: true,
+            media: {
+                orderBy: {
+                    order: 'asc'
+                }
+            }
+        } 
     });
 };
 
@@ -115,7 +122,14 @@ exports.getProductsByStore = (mitraProfileId) => {
 exports.getProductById = (id) => {
     return prisma.product.findUniqueOrThrow({
         where: { id },
-        include: { vehicleDetail: true }
+        include: { 
+            vehicleDetail: true,
+             media: {
+                orderBy: {
+                    order: 'asc'
+                }
+            }
+         }
     });
 };
 
