@@ -140,7 +140,7 @@ exports.updateStoreInfo = async (req, res) => {
         if (updateData.openHours) {
             updateData.openHours = JSON.parse(updateData.openHours);
         }
-        const updatedProfile = await mitraService.updateStoreInfo(mitraProfileId, updateData, files);
+        const updatedProfile = await productService.updateStoreInfo(mitraProfileId, updateData, files);
         res.status(200).json({ message: 'Informasi toko berhasil diperbarui.', data: updatedProfile });
     } catch (error) {
         res.status(400).json({ message: error.message });

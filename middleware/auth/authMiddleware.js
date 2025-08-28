@@ -50,7 +50,7 @@ exports.authorizeRoles = (...roles) => {
 
 exports.isMitra = (req, res, next) => {
     // Middleware ini mengasumsikan `req.user` sudah diisi oleh `verifyToken`
-    if (req.user && req.user.role === 'MITRA') {
+    if (req.user && req.user.role === 'mitra') {
         // Jika peran user adalah MITRA, lanjutkan ke handler berikutnya
         next();
     } else {

@@ -90,6 +90,14 @@ model MitraProfile {
   owner_address_village_name  String   @db.VarChar(100)
   owner_address_detail      String   @db.Text
   owner_address_postal_code   String   @db.VarChar(10)
+  social_media_platform     String   @db.VarChar(50)
+  social_media_account      String   @db.VarChar(100)
+  is_verified               Boolean  @default(false)
+  approved_at               DateTime? @db.Timestamptz(6)
+  latitude                  Float?
+  longitude                 Float?
+  store_images              String  @db.Text
+
   business_type             BusinessType
   business_entity           String   @db.VarChar(50)
   business_name             String?   @db.VarChar(100)
@@ -104,16 +112,10 @@ model MitraProfile {
   business_address_postal_code   String   @db.VarChar(10)
   business_address_detail   String   @db.Text
   business_duration         String   @db.VarChar(50)
-  social_media_platform     String   @db.VarChar(50)
-  social_media_account      String   @db.VarChar(100)
-  is_verified               Boolean  @default(false)
-  approved_at               DateTime? @db.Timestamptz(6)
-  latitude                  Float?
-  longitude                 Float?
-  store_images              String  @db.Text
-
   business_logo_url         String?  @db.Text
   business_banner_url       String?  @db.Text
+  business_description      String?  @db.Text
+  business_slug             String?
   openHours                 Json?     // Contoh: { "monday": "09:00-17:00", "tuesday": "09:00-17:00" }
 
   user User @relation(fields: [user_id], references: [id])
