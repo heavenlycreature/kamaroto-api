@@ -29,10 +29,10 @@ const fileFilter = (req, file, cb) => {
 
 // Gunakan .single() karena kita hanya mengunggah satu foto per mekanik
 // 'photo' adalah nama field yang akan dikirim dari frontend
-const mechanicUpload = multer({
+const staffUpload = multer({
   storage: storage,
   limits: { fileSize: 1024 * 1024 * 3 }, // Batas 3MB
   fileFilter: fileFilter
 }).single('photo');
 
-module.exports = mechanicUpload;
+module.exports = staffUpload;

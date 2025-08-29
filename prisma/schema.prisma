@@ -121,7 +121,7 @@ model MitraProfile {
   user User @relation(fields: [user_id], references: [id])
 
   products                         Product[]
-  mechanics                        Mechanic[]
+  staff                            Staff[]
   workshopSlots                    WorkshopSlot[]
   washSlots                        WashSlot[]
 
@@ -266,26 +266,37 @@ model RentalBlackout {
 // SKEMA UNTUK MANAJEMEN BENGKEL & CUCI
 // ===============================================
 
-enum MechanicStatus {
+enum StaffRole {
+  MECHANIC
+  WASHER
+}
+
+enum StaffStatus { 
   AVAILABLE
   ON_LEAVE
   INACTIVE
 }
 
-// Model Mekanik yang bekerja di sebuah Toko/Bengkel
-model Mechanic {
-  id        String         @id @default(cuid())
+// [REVISI] Ganti nama model Mechanic menjadi Staff dan tambahkan kolom `role`
+model Staff {
+  id        String      @id @default(cuid())
   name      String
-  skillset  String?        // Contoh: "Spesialis Mesin Toyota, Umum"
-  status    MechanicStatus @default(AVAILABLE)
-  photoUrl  String?        
+  skillset  String?
+  status    StaffStatus @default(AVAILABLE)
+  photoUrl  String?
+  role      StaffRole  
 
   mitraProfile    MitraProfile @relation(fields: [mitraProfileId], references: [id])
   mitraProfileId  Int
 
+  // assignedWorkOrders WorkOrder[] // Relasi ini tetap jika Anda menggunakannya
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@map("staff") // Ganti nama tabel di database menjadi 'staff'
 }
+
 
 // Model Slot untuk Bengkel (Workshop)
 model WorkshopSlot {
@@ -293,7 +304,7 @@ model WorkshopSlot {
   date               DateTime @db.Date
   hour               Int      // Jam mulai, format 24h (e.g., 9 untuk 09:00)
   capacity           Int      // Jumlah mobil yang bisa ditangani di jam ini
-  mechanicsAvailable Int      // Jumlah mekanik yang tersedia di jam ini
+  staffAvailable     Int      // Jumlah mekanik yang tersedia di jam ini
 
   mitraProfile       MitraProfile @relation(fields: [mitraProfileId], references: [id])
   mitraProfileId     Int
@@ -307,10 +318,11 @@ model WorkshopSlot {
 
 // Model Slot untuk Cuci Kendaraan
 model WashSlot {
-  id         String   @id @default(cuid())
-  date       DateTime @db.Date
-  hour       Int
-  capacity   Int
+  id               String   @id @default(cuid())
+  date             DateTime @db.Date
+  hour             Int
+  capacity         Int
+  staffAvailable   Int
 
   mitraProfile       MitraProfile @relation(fields: [mitraProfileId], references: [id])
   mitraProfileId     Int
