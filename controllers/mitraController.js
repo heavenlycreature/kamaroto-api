@@ -204,14 +204,14 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const updateData = req.body;
+        const productData = req.body;
         const files = req.files; 
         
         if (productData.vehicleDetail) {
             productData.vehicleDetail = JSON.parse(productData.vehicleDetail);
         }
 
-        const updatedProduct = await productService.updateProduct(id, updateData, files);
+        const updatedProduct = await productService.updateProduct(id, productData, files);
         res.status(200).json({ message: 'Produk berhasil diperbarui.', data: updatedProduct });
     } catch (error) {
         res.status(400).json({ message: error.message });

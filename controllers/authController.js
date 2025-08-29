@@ -38,7 +38,7 @@ async function getSettingValue(key) {
  * Mendaftarkan user Mitra baru beserta profilnya dalam satu transaksi.
  */
 exports.registerMitra = async (req, res) => {
-    // 1. Ambil semua data dari body (user & profile)
+    
     const {
         password, // Data untuk tabel 'users'
         // Data untuk tabel 'mitra_profiles'
@@ -62,6 +62,7 @@ exports.registerMitra = async (req, res) => {
         return res.status(400).json({ message: 'Gambar selfie wajib diunggah.' });
     }
 
+    const sanitizedOwnerEmail = owner_email.trim();
     const store_images = `/uploads/stores/${req.file.filename}`;
 
     try {
@@ -86,7 +87,7 @@ exports.registerMitra = async (req, res) => {
             const createdUser = await tx.user.create({
                 data: {
                     name: owner_name,
-                    email: owner_email,
+                    email: sanitizedOwnerEmail,
                     password: hashedPassword,
                     phone: owner_phone,
                     role: 'mitra',
@@ -94,7 +95,7 @@ exports.registerMitra = async (req, res) => {
                     mitraProfile: {
                         create: {
                             pic_name, pic_phone, pic_email, pic_status,
-                            owner_name, owner_phone, owner_email, owner_ktp,
+                            owner_name, owner_phone, owner_email: sanitizedOwnerEmail, owner_ktp,
                             owner_address_province_code, owner_address_province_name,
                             owner_address_regency_code, owner_address_regency_name,
                             owner_address_district_code, owner_address_district_name,
@@ -118,7 +119,6 @@ exports.registerMitra = async (req, res) => {
 
             // 2. Buat entri Referral di dalam transaksi yang sama
             if (referrerId) {
-                // PERBAIKAN: Gunakan key dan tipe yang benar untuk Mitra
                 const rewardPoint = await getSettingValue('referral_reward_mitra');
                 await tx.referral.create({
                     data: {
@@ -163,12 +163,29 @@ exports.registerMitra = async (req, res) => {
         }
         // Tangani error jika email sudah ada (Prisma error code P2002)
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            return res.status(400).json({ message: 'Email ini sudah terdaftar.' });
+             console.error('Unique constraint failed on:', error.meta?.target);
+            // Tangani per kolom:
+            const target = Array.isArray(error.meta?.target) ? error.meta.target.join(',') : String(error.meta?.target || '');
+
+                if (target.includes('users_email_key') || target.includes('email')) {
+                return res.status(400).json({ message: 'Email ini sudah terdaftar.' });
+                }
+                if (target.includes('owner_phone')) {
+                return res.status(400).json({ message: 'Nomor telepon sudah terdaftar.' });
+                }
+                if (target.includes('owner_ktp')) {
+                return res.status(400).json({ message: 'Nomor KTP sudah terdaftar.' });
+                }
+                if (target.includes('pic_email') || target.includes('owner_email')) {
+                return res.status(400).json({ message: 'Email PIC/Owner sudah terdaftar.' });
+                }
+                // fallback umum
+                return res.status(400).json({ message: 'Data sudah terdaftar (unik).', detail: target });
+            }
         }
         console.error('Registration error:', error);
         res.status(500).json({ message: 'Terjadi kesalahan pada server saat registrasi.' });
-    }
-};
+    };
 
 /**
  * Mendaftarkan user CO (Credit Officer) baru beserta profilnya dalam satu transaksi.

@@ -166,8 +166,16 @@ exports.getProductById = (id) => {
  * @returns {Promise<object>} - Objek produk yang sudah diperbarui.
  */
 exports.updateProduct = async (id, data, files = []) => {
-    const { vehicleDetail, existingMediaUrls, ...productData } = data;
+   const { vehicleDetail, existingMediaUrls, mediaOrder, ...productData } = data;
     const keptUrls = existingMediaUrls ? JSON.parse(existingMediaUrls) : [];
+    const finalOrder = mediaOrder ? JSON.parse(mediaOrder) : [];
+
+     if (productData.price) {
+        productData.price = parseFloat(productData.price);
+    }
+    if (productData.stock) {
+        productData.stock = parseInt(productData.stock, 10);
+    }
 
     const oldMedia = await prisma.productMedia.findMany({
         where: { productId: id },
@@ -200,11 +208,18 @@ exports.updateProduct = async (id, data, files = []) => {
 
 
     return prisma.$transaction(async (tx) => {
+        let vehicleDetailUpdateData;
+        if (vehicleDetail) {
+            const { id: vehicleId, productId, ...restOfVehicleDetail } = vehicleDetail;
+            vehicleDetailUpdateData = restOfVehicleDetail;
+        }
         await tx.product.update({
             where: { id },
             data: {
                 ...productData,
-                vehicleDetail: vehicleDetail ? { update: vehicleDetail } : undefined,
+                 vehicleDetail: vehicleDetail ? { 
+                    update: vehicleDetailUpdateData 
+                } : undefined,
             },
         });
 
@@ -267,24 +282,30 @@ exports.deleteProduct = async (id) => {
         select: { url: true }
     });
 
-    await prisma.product.delete({
-        where: { id }
+    await prisma.$transaction(async (tx) => {
+        await tx.productMedia.deleteMany({
+            where: { productId: id }
+        });
+
+        await tx.vehicleDetail.deleteMany({
+            where: { productId: id }
+        });
+
+        await tx.product.delete({
+            where: { id }
+        });
     });
 
     if (mediaToDelete.length > 0) {
-        console.log('Menghapus file fisik dari storage:', mediaToDelete.map(m => m.url));
         mediaToDelete.forEach(media => {
             try {
                 const filePath = path.join(process.cwd(), 'public', media.url);
                 if (fs.existsSync(filePath)) {
                     fs.unlinkSync(filePath);
-                    console.log(`File berhasil dihapus: ${filePath}`);
                 }
             } catch (err) {
                 console.error(`Gagal menghapus file fisik ${media.url}:`, err);
             }
         });
     }
-
-    return;
 }
