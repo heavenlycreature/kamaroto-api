@@ -1,55 +1,8 @@
 const { Prisma, PrismaClient } = require('@prisma/client'); // Sesuaikan path ke prisma client Anda
-const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 
-exports.updateStoreInfo = async (mitraProfileId, data, files = {}) => {
-    const currentProfile = await prisma.mitraProfile.findUnique({
-        where: { id: mitraProfileId },
-        select: { business_logo_url: true, business_banner_url: true }
-    });
-
-    if (!currentProfile) {
-        throw new Error('Profil Mitra tidak ditemukan.');
-    }
-
-    const dataToUpdate = { ...data };
-
-    const deleteOldFile = (filePath) => {
-        if (!filePath) return;
-        try {
-            const fullPath = path.join(process.cwd(), 'public', filePath);
-            if (fs.existsSync(fullPath)) {
-                fs.unlinkSync(fullPath);
-                console.log(`File lama dihapus: ${fullPath}`);
-            }
-        } catch (err) {
-            console.error(`Gagal menghapus file lama ${filePath}:`, err);
-        }
-    };
-
-    if (files.logo && files.logo[0]) {
-        deleteOldFile(currentProfile.business_logo_url);
-        dataToUpdate.business_logo_url = `/uploads/store-assets/${files.logo[0].filename}`;
-    }
-
-    if (files.banner && files.banner[0]) {
-        deleteOldFile(currentProfile.business_banner_url);
-        dataToUpdate.business_banner_url = `/uploads/store-assets/${files.banner[0].filename}`;
-    }
-    
-    Object.keys(dataToUpdate).forEach(key => {
-        if (dataToUpdate[key] === undefined) {
-            delete dataToUpdate[key];
-        }
-    });
-    
-    return prisma.mitraProfile.update({
-        where: { id: mitraProfileId },
-        data: dataToUpdate
-    });
-};
-
+const prisma = new PrismaClient();
 /**
  * Membuat produk baru (Kendaraan atau Sparepart).
  * Jika tipenya VEHICLE, data detailnya juga akan dibuat dalam satu transaksi.

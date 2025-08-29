@@ -278,6 +278,7 @@ model Mechanic {
   name      String
   skillset  String?        // Contoh: "Spesialis Mesin Toyota, Umum"
   status    MechanicStatus @default(AVAILABLE)
+  photoUrl  String?        
 
   mitraProfile    MitraProfile @relation(fields: [mitraProfileId], references: [id])
   mitraProfileId  Int

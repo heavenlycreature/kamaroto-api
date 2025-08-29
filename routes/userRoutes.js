@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
-const addressController = require('../controllers/addressController');
 const coController = require('../controllers/coController');
-const mitraController = require('../controllers/mitraController');
+const mitraController = require('../controllers/mitra/mitraController');
 const authController = require('../controllers/authController');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth/authMiddleware');
 const {allowResubmit} = require('../middleware/auth/allowResubmit');
